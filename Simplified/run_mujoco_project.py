@@ -104,7 +104,7 @@ def controller(model, data):
     thrusts = controller_pid.update(model, data)
     data.ctrl[0] = thrusts[0]
     data.ctrl[1] = thrusts[1]
-    print("Thrusts:", data.ctrl[0], data.ctrl[1])
+    # print("Thrusts:", data.ctrl[0], data.ctrl[1])
 
 
 
