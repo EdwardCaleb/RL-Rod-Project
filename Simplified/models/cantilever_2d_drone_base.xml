@@ -1,0 +1,95 @@
+<mujoco model="cantilever_2d_drone">
+
+    <compiler angle="degree" inertiafromgeom="true"/>
+    <option timestep="0.01" gravity="0 0 -9.81" integrator="RK4"/>
+
+    <default>
+        <joint damping="0.0005" stiffness="0.001" limited="true"/>
+        <geom density="500" friction="0.8 0.1 0.1" rgba="0.8 0.6 0.4 1"/>
+    </default>
+
+    <asset>
+        <!-- Texturas y materiales -->
+        <texture builtin="gradient" height="100" width="100" rgb1="1 1 1" rgb2="0.6 0.8 1" type="skybox"/>
+        <texture name="texplane" builtin="checker" height="100" width="100" rgb1="0.7 0.7 0.7" rgb2="0.9 0.9 0.9" type="2d"/>
+        <material name="MatPlane" reflectance="0.3" shininess="1" specular="0.5" texrepeat="5 5" texture="texplane"/>
+        <material name="MatBeam" specular="0.3" shininess="0.5" rgba="0.3 0.7 0.3 1"/>
+        <material name="MatDrone" specular="0.5" shininess="1" rgba="0.8 0.2 0.2 1"/>
+    </asset>
+
+    <worldbody>
+
+        <!-- 💡 Luz ambiental -->
+        <light name="main_light" pos="1 1 1" dir="-1 -1 -2" diffuse="1 1 1" specular="0.3 0.3 0.3"/>
+
+        <!-- 🌍 Piso y pared -->
+        <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 0" material="MatPlane"/>
+        <geom name="wall" type="box" size="0.05 0.1 0.5" pos="0 0 0.25" rgba="0.2 0.3 0.8 1"/>
+
+        <!-- ⚙️ Base fija de la viga -->
+        <body name="beam_base" pos="0.05 0 0.5">
+            <site name="base_site" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
+
+            <!-- Segmentos del cantilever -->
+            <body name="seg1" pos="0.1 0 0">
+                <joint name="hinge1" type="hinge" axis="0 1 0" range="-15 15"/>
+                <geom type="capsule" fromto="0 0 0 0.2 0 0" size="0.01" material="MatBeam"/>
+                
+                <body name="seg2" pos="0.2 0 0">
+                    <joint name="hinge2" type="hinge" axis="0 1 0" range="-15 15"/>
+                    <geom type="capsule" fromto="0 0 0 0.2 0 0" size="0.01" material="MatBeam"/>
+
+                    <body name="seg3" pos="0.2 0 0">
+                        <joint name="hinge3" type="hinge" axis="0 1 0" range="-15 15"/>
+                        <geom type="capsule" fromto="0 0 0 0.2 0 0" size="0.01" material="MatBeam"/>
+
+                        <!-- 🚁 Dron 2D al extremo libre -->
+                        <body name="drone_2d" pos="0.2 0 0">
+                            <!-- sin joint: queda fijo -->
+                            <geom name="drone_body" type="box" size="0.08 0.01 0.03" material="MatDrone" mass="0.15"/>
+                            
+                            <!-- brazos -->
+                            <geom name="arm_left"  type="box" pos="-0.08 0 0.02" size="0.05 0.005 0.005" rgba="0.8 0.8 0.8 1"/>
+                            <geom name="arm_right" type="box" pos=" 0.08 0 0.02" size="0.05 0.005 0.005" rgba="0.8 0.8 0.8 1"/>
+                            
+                            <!-- hélices -->
+                            <body name="prop_left" pos="-0.13 0 0.03">
+                                <geom type="cylinder" size="0.02 0.003" rgba="0.3 1 0.3 0.6"/>
+                                <site name="motor_left" pos="0 0 0.003" size="0.005" rgba="0 1 0 0.7" type="cylinder"/>
+                            </body>
+
+                            <body name="prop_right" pos="0.13 0 0.03">
+                                <geom type="cylinder" size="0.02 0.003" rgba="0.3 1 0.3 0.6"/>
+                                <site name="motor_right" pos="0 0 0.003" size="0.005" rgba="0 1 0 0.7" type="cylinder"/>
+                            </body>
+
+                            <!-- ejes de referencia -->
+                            <site name="x_axis" type="box" pos="0.15 0 0" size="0.15 0.002 0.002" rgba="1 0 0 0.3"/>
+                            <site name="z_axis" type="box" pos="0 0 0.1" size="0.15 0.002 0.002" rgba="0 0 1 0.3"/>
+                        </body>
+
+                    </body>
+                </body>
+            </body>
+        </body>
+
+    </worldbody>
+
+    <!-- ⚙️ Actuadores (2 hélices) -->
+    <actuator>
+        <motor site="motor_left"  ctrlrange="0 2" gear="0 0 1 0 0 -0.05"/>
+        <motor site="motor_right" ctrlrange="0 2" gear="0 0 1 0 0  0.05"/>
+    </actuator>
+
+    <!-- 📡 Sensores -->
+    <sensor>
+        <framepos  name="pos_drone"  objtype="body" objname="drone_2d"/>
+        <framequat name="quat_drone" objtype="body" objname="drone_2d"/>
+    </sensor>
+
+    <!-- 🧩 Restricción 2D (bloquear movimiento en Y) -->
+    <equality>
+        <weld name="2d_constraint" active="true" body1="world" body2="beam_base" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+    </equality>
+
+</mujoco>

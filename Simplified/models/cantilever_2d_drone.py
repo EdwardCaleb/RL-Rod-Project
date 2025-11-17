@@ -26,7 +26,7 @@ XML_HEADER = r"""
         <geom name="wall" type="box" size="0.05 0.05 0.15" pos="0 0 0.25" rgba="0.2 0.3 0.8 1"/>
 
         <!-- ⚙️ Base fija de la viga -->
-        <body name="beam_base" pos="0.05 0 0.8">
+        <body name="beam_base" pos="0.05 0 1.0">
             <site name="base_site" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
 """
 
@@ -67,6 +67,8 @@ XML_FOOTER = r"""
     <sensor>
         <framepos  name="pos_drone"  objtype="body" objname="drone_2d"/>
         <framequat name="quat_drone" objtype="body" objname="drone_2d"/>
+        <framelinvel name="linvel_drone" objtype="body" objname="drone_2d"/>
+        <frameangvel name="rotvel_drone" objtype="body" objname="drone_2d"/>
     </sensor>
 
     <!-- 🧩 Restricción 2D (bloquear movimiento en Y) -->
@@ -126,3 +128,5 @@ if __name__ == "__main__":
     with open("cantilever_drone2d_aligned.xml", "w", encoding="utf-8") as f:
         f.write(xml_text)
     print("✅ Archivo 'cantilever_drone2d_aligned.xml' generado correctamente.")
+    print(xml_text)
+    
