@@ -9,11 +9,18 @@
 
     <asset>
         <texture builtin="gradient" type="skybox" height="100" width="100" rgb1="1 1 1" rgb2="0.6 0.8 1"/>
-        <texture name="texplane" builtin="checker" height="100" width="100" rgb1="0.7 0.7 0.7" rgb2="0.9 0.9 0.9" type="2d"/>  
+        <texture name="texplane" builtin="checker" height="100" width="100" rgb1="0.7 0.7 0.7" rgb2="0.9 0.9 0.9" type="2d"/>
         <material name="MatPlane" reflectance="0.3" shininess="1" specular="0.5" texrepeat="5 5" texture="texplane"/>
         <material name="MatBeam" specular="0.3" shininess="0.5" rgba="0.3 0.7 0.3 1"/>
         <material name="MatDrone" specular="0.5" shininess="1" rgba="0.8 0.2 0.2 1"/>
     </asset>
+
+    <visual>
+        <map znear="0.01" zfar="50"/>
+        <global offwidth="800" offheight="600" fovy="45"/>
+        <quality shadowsize="2048" />
+    </visual>
+    
 
     <worldbody>
         <light cutoff="100" diffuse="1 1 1" dir="-0 0 -1.3" directional="true" exponent="1" pos="0 0 1.3" specular=".1 .1 .1"/>
@@ -28,19 +35,19 @@
                 <joint name="hinge1" type="hinge" axis="0 1 0" range="-15 15"/>
                 <geom type="capsule" fromto="0 0 0 0.200 0 0" size="0.01" material="MatBeam" mass="0.017"/>
                 <body name="seg2" pos="0.200 0 0">
-                    <joint name="hinge2" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>        
+                    <joint name="hinge2" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>
                     <geom type="capsule" fromto="0 0 0 0.200 0 0" size="0.01" rgba="0.3 0.70 0.50 1" mass="0.017"/>
                 <body name="seg3" pos="0.200 0 0">
-                    <joint name="hinge3" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>        
+                    <joint name="hinge3" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>
                     <geom type="capsule" fromto="0 0 0 0.200 0 0" size="0.01" rgba="0.3 0.60 0.60 1" mass="0.017"/>
                 <body name="seg4" pos="0.200 0 0">
-                    <joint name="hinge4" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>        
+                    <joint name="hinge4" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>
                     <geom type="capsule" fromto="0 0 0 0.200 0 0" size="0.01" rgba="0.3 0.50 0.70 1" mass="0.017"/>
                 <body name="seg5" pos="0.200 0 0">
-                    <joint name="hinge5" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>        
+                    <joint name="hinge5" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>
                     <geom type="capsule" fromto="0 0 0 0.200 0 0" size="0.01" rgba="0.3 0.40 0.80 1" mass="0.017"/>
                 <body name="seg6" pos="0.200 0 0">
-                    <joint name="hinge6" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>        
+                    <joint name="hinge6" type="hinge" axis="0 1 0" range="-15 15" damping="0.0005" stiffness="0.0001"/>
                     <geom type="capsule" fromto="0 0 0 0.200 0 0" size="0.01" rgba="0.3 0.30 0.90 1" mass="0.017"/>
 
                         <!-- 🚁 Dron 2D fijo al extremo libre -->
@@ -52,11 +59,11 @@
                             <!-- hélices -->
                             <body name="prop_left" pos="-0.13 0 0.03">
                                 <geom type="cylinder" size="0.02 0.003" rgba="0.3 1 0.3 0.6"/>
-                                <site name="motor_left" pos="0 0 0.003" size="0.005" rgba="0 1 0 0.7" type="cylinder"/>        
+                                <site name="motor_left" pos="0 0 0.003" size="0.005" rgba="0 1 0 0.7" type="cylinder"/>
                             </body>
                             <body name="prop_right" pos="0.13 0 0.03">
                                 <geom type="cylinder" size="0.02 0.003" rgba="0.3 1 0.3 0.6"/>
-                                <site name="motor_right" pos="0 0 0.003" size="0.005" rgba="0 1 0 0.7" type="cylinder"/>       
+                                <site name="motor_right" pos="0 0 0.003" size="0.005" rgba="0 1 0 0.7" type="cylinder"/>
                             </body>
                             <!-- ejes de referencia -->
                             <site name="x_axis" type="box" pos="0.15 0 0" size="0.15 0.002 0.002" rgba="1 0 0 0.3"/>
@@ -88,7 +95,7 @@
 
     <!-- 🧩 Restricción 2D (bloquear movimiento en Y) -->
     <equality>
-        <weld name="2d_constraint" active="true" body1="world" body2="beam_base" solimp="0.9 0.95 0.001" solref="0.02 1"/>     
+        <weld name="2d_constraint" active="true" body1="world" body2="beam_base" solimp="0.9 0.95 0.001" solref="0.02 1"/>
     </equality>
 
 </mujoco>
