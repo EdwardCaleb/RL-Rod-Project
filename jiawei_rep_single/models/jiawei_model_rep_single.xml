@@ -49,7 +49,7 @@
                     <geom type="capsule" fromto="0 0 0 0.200 0 0" size="0.01" rgba="0.3 0.30 0.90 1" mass="0.017"/>
 
                         <!-- 🚁 Dron 3D unido con articulación esférica (ball) al extremo -->
-                        <body name="drone_3d" pos="0.20 0.00 0.05">
+                        <body name="drone_3d" pos="0.22 0.00 0.00">
                             <!-- 🔵 Unión esférica: permite rotación libre 3D (limited="false" : espherica, true: fixed)-->
                             <joint name="drone_ball" type="ball" damping="0.01" stiffness="0" limited="false"/>
 
@@ -84,7 +84,6 @@
                             <site name="y_axis" type="box" pos="0 0.20 0" size="0.003 0.20 0.003" rgba="0 1 0 0.3"/>
                             <site name="z_axis" type="box" pos="0 0 0.20" size="0.003 0.003 0.20" rgba="0 0 1 0.3"/>
                         </body>
-
 
                 </body>
                 </body>
