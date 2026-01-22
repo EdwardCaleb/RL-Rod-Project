@@ -53,7 +53,7 @@
                             <!-- 🔵 Unión esférica: permite rotación libre 3D (limited="false" : espherica, true: fixed)-->
                             <joint name="drone_ball" type="ball" damping="0.01" stiffness="0" limited="false"/>
 
-                            <geom name="drone_body" type="box" size="0.08 0.04 0.02" material="MatDrone" mass="0.30" contype="0" conaffinity="0"/>
+                            <geom name="drone_body" type="box" size="0.04 0.04 0.02" material="MatDrone" mass="0.30" contype="0" conaffinity="0"/>
 
                             <!-- brazos (ahora en cruz 3D simple) -->
                             <geom name="arm_x_pos" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1"/>
