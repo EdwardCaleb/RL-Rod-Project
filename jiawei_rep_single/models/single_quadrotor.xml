@@ -3,8 +3,8 @@
   <option timestep="0.01" gravity="0 0 -9.81" density="1" viscosity="1e-5" integrator="RK4"/>
 
   <default>
-    <joint damping="0.0005" stiffness="0.001" limited="false"/>
-    <geom condim="3" density="500" friction="1 0.5 0.5" margin="0.01" rgba="0.8 0.6 0.4 1"/>
+    <joint damping="0.02" stiffness="0.001" limited="false"/>
+    <geom condim="3" density="200" friction="1 0.5 0.5" margin="0.01" rgba="0.8 0.6 0.4 1"/>
   </default>
 
   <asset>
@@ -28,10 +28,10 @@
             mass="0.30" contype="0" conaffinity="0"/>
 
       <!-- brazos -->
-      <geom name="arm_x_pos" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1"/>
-      <geom name="arm_x_neg" type="box" pos="-0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1"/>
-      <geom name="arm_y_pos" type="box" pos="0  0.10 0" size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1"/>
-      <geom name="arm_y_neg" type="box" pos="0 -0.10 0" size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1"/>
+      <geom name="arm_x_pos" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
+      <geom name="arm_x_neg" type="box" pos="-0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
+      <geom name="arm_y_pos" type="box" pos="0  0.10 0" size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
+      <geom name="arm_y_neg" type="box" pos="0 -0.10 0" size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
 
       <!-- hélices + sitios de motores -->
       <body name="prop0" pos=" 0.16  0.00 0.03">
