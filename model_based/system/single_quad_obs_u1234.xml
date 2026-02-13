@@ -41,6 +41,9 @@
       <geom name="drone_body" type="box" size="0.04 0.04 0.02" material="MatDrone"
             mass="0.30" contype="0" conaffinity="0"/>
 
+      <!-- Site en el centro del cuerpo para aplicar wrench (u1,u2,u3,u4) -->
+      <site name="com_site" pos="0 0 0" size="0.005" rgba="1 0 0 1"/>
+
       <geom name="arm_x_pos" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
       <geom name="arm_x_neg" type="box" pos="-0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
       <geom name="arm_y_pos" type="box" pos="0  0.10 0" size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
@@ -70,10 +73,23 @@
   </worldbody>
 
   <actuator>
-    <motor site="motor0" ctrlrange="0 2" gear="0 0 1 0 0 -0.05"/>
-    <motor site="motor1" ctrlrange="0 2" gear="0 0 1 0 0  0.05"/>
-    <motor site="motor2" ctrlrange="0 2" gear="0 0 1 0 0 -0.05"/>
-    <motor site="motor3" ctrlrange="0 2" gear="0 0 1 0 0  0.05"/>
+      <!-- u1: thrust total a lo largo de +z del cuerpo (en com_site) -->
+      <general name="u1_thrust" site="com_site"
+                ctrllimited="true" ctrlrange="0 10"
+                gear="0 0 1  0 0 0"/>
+
+      <!-- u2,u3,u4: torques en el frame del cuerpo -->
+      <general name="u2_tau_x" site="com_site"
+                ctrllimited="true" ctrlrange="-1 1"
+                gear="0 0 0  1 0 0"/>
+
+      <general name="u3_tau_y" site="com_site"
+                ctrllimited="true" ctrlrange="-1 1"
+                gear="0 0 0  0 1 0"/>
+
+      <general name="u4_tau_z" site="com_site"
+                ctrllimited="true" ctrlrange="-0.2 0.2"
+                gear="0 0 0  0 0 1"/>
   </actuator>
 
   <sensor>

@@ -3,7 +3,7 @@ import numpy as np
 def clamp_vec(x, lo, hi):
     return np.minimum(np.maximum(x, lo), hi)
 
-class MPPIPlanner:
+class SingleMPPIPlanner:
     """
     MPPI para dron como punto-masa:
       x = [p(3), v(3)]
