@@ -10,3 +10,9 @@ WARNING: Nan, Inf or huge value in QACC at DOF 6. The simulation is unstable. Ti
 Thu Feb 12 14:17:24 2026
 WARNING: Nan, Inf or huge value in QACC at DOF 18. The simulation is unstable. Time = 20.6600.
 
+Tue Feb 17 13:03:43 2026
+WARNING: Nan, Inf or huge value in QPOS at DOF 0. The simulation is unstable. Time = 1.7500.
+
+Tue Feb 17 17:51:43 2026
+WARNING: Nan, Inf or huge value in CTRL at ACTUATOR 1. The simulation is unstable. Time = 43.4500.
+

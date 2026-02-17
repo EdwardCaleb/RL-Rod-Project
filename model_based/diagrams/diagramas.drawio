@@ -1,6 +1,6 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" version="29.3.8">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" version="29.4.0">
   <diagram name="Página-1" id="450AoIyQVvfvDko_-DF1">
-    <mxGraphModel dx="438" dy="180" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="1" shadow="0">
+    <mxGraphModel dx="1007" dy="529" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="1" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -4689,10 +4689,10 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-2" parent="1" style="whiteSpace=wrap;html=1;fillColor=#99FF33;opacity=20;rounded=0;glass=0;shadow=0;" value="" vertex="1">
-          <mxGeometry height="187" width="190" x="12400" y="530" as="geometry" />
+          <mxGeometry height="200" width="190" x="12400" y="530" as="geometry" />
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-3" parent="1" style="whiteSpace=wrap;html=1;fillColor=#A2B2C4;opacity=20;rounded=0;glass=0;shadow=0;" value="" vertex="1">
-          <mxGeometry height="210" width="360" x="12330" y="280" as="geometry" />
+          <mxGeometry height="250" width="360" x="12330" y="240" as="geometry" />
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-4" edge="1" parent="1" source="SudVSVRvcy4Ycsfnvqdu-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;labelBackgroundColor=none;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="SudVSVRvcy4Ycsfnvqdu-41" value="">
           <mxGeometry relative="1" as="geometry">
@@ -4892,8 +4892,7 @@
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="12720" y="451" />
-              <mxPoint x="12720" y="685" />
-              <mxPoint x="12630" y="685" />
+              <mxPoint x="12720" y="699" />
             </Array>
             <mxPoint x="12660" y="836.3400000000001" as="targetPoint" />
           </mxGeometry>
@@ -4902,8 +4901,7 @@
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="12700" y="421" />
-              <mxPoint x="12700" y="660" />
-              <mxPoint x="12650" y="660" />
+              <mxPoint x="12700" y="674" />
             </Array>
             <mxPoint x="12660" y="836.3400000000001" as="targetPoint" />
           </mxGeometry>
@@ -4915,7 +4913,7 @@
           <mxGeometry height="60" width="120" x="12430" y="305.5" as="geometry" />
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-43" parent="1" style="rounded=0;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Optitrack" vertex="1">
-          <mxGeometry height="60" width="120" x="13072" y="770" as="geometry" />
+          <mxGeometry height="60" width="132" x="13060" y="770" as="geometry" />
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-44" parent="1" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=none;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/Phosphor_Thin_Vol_2-1981/flying-saucer-thin-1140.svg" value="" vertex="1">
           <mxGeometry height="60" width="60" x="13162" y="390.5" as="geometry" />
@@ -4953,10 +4951,10 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-55" parent="1" style="whiteSpace=wrap;html=1;" value="GP training" vertex="1">
-          <mxGeometry height="50" width="120" x="12430" y="647" as="geometry" />
+          <mxGeometry height="50" width="120" x="12430" y="661.44" as="geometry" />
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-56" parent="1" style="whiteSpace=wrap;html=1;" value="GP prediction" vertex="1">
-          <mxGeometry height="50" width="120" x="12430" y="557" as="geometry" />
+          <mxGeometry height="50" width="120" x="12430" y="570" as="geometry" />
         </mxCell>
         <mxCell id="SudVSVRvcy4Ycsfnvqdu-57" edge="1" parent="1" source="SudVSVRvcy4Ycsfnvqdu-56" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.54;exitY=-0.005;exitDx=0;exitDy=0;entryX=0.517;entryY=1.009;entryDx=0;entryDy=0;entryPerimeter=0;exitPerimeter=0;" target="SudVSVRvcy4Ycsfnvqdu-41">
           <mxGeometry relative="1" as="geometry">
@@ -4968,6 +4966,18 @@
           <mxGeometry relative="1" x="-0.1006" y="1" as="geometry">
             <mxPoint x="-14" y="-10" as="offset" />
           </mxGeometry>
+        </mxCell>
+        <mxCell id="p7Lj-YLA3kwAvS-Em5Lp-1" parent="1" style="text;align=center;verticalAlign=middle;rounded=0;fontStyle=3;dashed=1;fillColor=#f5f5f5;gradientColor=#b3b3b3;strokeColor=#666666;labelBackgroundColor=none;labelBorderColor=none;textShadow=0;whiteSpace=wrap;html=1;convertToSvg=0;" value="250Hz" vertex="1">
+          <mxGeometry height="30" width="40" x="13060" y="770" as="geometry" />
+        </mxCell>
+        <mxCell id="p7Lj-YLA3kwAvS-Em5Lp-2" parent="1" style="text;align=center;verticalAlign=middle;rounded=0;fontStyle=3;dashed=1;fillColor=#f5f5f5;gradientColor=#b3b3b3;strokeColor=#666666;labelBackgroundColor=none;labelBorderColor=none;textShadow=0;whiteSpace=wrap;html=1;convertToSvg=0;" value="50Hz" vertex="1">
+          <mxGeometry height="30" width="40" x="12330" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="p7Lj-YLA3kwAvS-Em5Lp-3" parent="1" style="text;align=center;verticalAlign=middle;rounded=0;fontStyle=3;dashed=1;fillColor=#f5f5f5;gradientColor=#b3b3b3;strokeColor=#666666;labelBackgroundColor=none;labelBorderColor=none;textShadow=0;whiteSpace=wrap;html=1;convertToSvg=0;" value="150Hz" vertex="1">
+          <mxGeometry height="30" width="40" x="12759" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="p7Lj-YLA3kwAvS-Em5Lp-4" parent="1" style="text;align=center;verticalAlign=middle;rounded=0;fontStyle=3;dashed=1;fillColor=#f5f5f5;gradientColor=#b3b3b3;strokeColor=#666666;labelBackgroundColor=none;labelBorderColor=none;textShadow=0;whiteSpace=wrap;html=1;convertToSvg=0;" value="100Hz" vertex="1">
+          <mxGeometry height="30" width="40" x="12400" y="530" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
