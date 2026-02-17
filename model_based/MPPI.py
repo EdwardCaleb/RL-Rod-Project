@@ -49,6 +49,8 @@ class SingleMPPIPlanner:
 
         self.goal = np.zeros(3, dtype=float)
 
+        self.model = None  # <-- por defecto no hay modelo
+
         # Secuencia nominal (H x 3)
         self.u_nom = np.zeros((self.H, 3), dtype=float)
 
@@ -106,11 +108,24 @@ class SingleMPPIPlanner:
     # ---------------------------
     # Dinámica discreta simple
     # ---------------------------
+    def define_model(self, model):
+        """
+        model debe tener: step(pos, vel, action) -> (new_pos, new_vel, ...)
+        """
+        if not hasattr(model, "step"):
+            raise TypeError("El modelo debe tener un método .step(pos, vel, action)")
+        self.model = model
+    
     def _step_dynamics(self, p, v, u):
-        # semi-implicit Euler
-        v2 = v + u * self.dt
-        p2 = p + v2 * self.dt
-        return p2, v2
+        if self.model is None:
+            # fallback a semi-implicit Euler
+            v2 = v + u * self.dt
+            p2 = p + v2 * self.dt
+            return p2, v2
+
+        out = self.model.step(p, v, u)
+        # soporta (p2, v2) o (p2, v2, pos_var, vel_var, ...)
+        return out[0], out[1]
 
     # ---------------------------
     # MPPI core
