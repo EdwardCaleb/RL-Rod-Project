@@ -72,8 +72,8 @@
     </body>
 
     <!-- Flecha visual (mocap) para mostrar F_des -->
-    <body name="force_arrow" mocap="true" pos="0 0 0">
-      <geom name="force_geom"
+    <body name="force_arrow_1" mocap="true" pos="0 0 0">
+      <geom name="force_geom_1"
             type="capsule"
             size="0.01 0.10"
             rgba="1 0 0 1"

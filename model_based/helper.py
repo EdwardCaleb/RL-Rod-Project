@@ -14,19 +14,20 @@ def quat_to_rotmat(q):
 
 
 class ForceArrow:
-    def __init__(self, model, data):
+    def __init__(self, model, data, arrow_idx):
         self.model = model
         self.data = data
+        self.arrow_idx = arrow_idx
 
-        self.arrow_body = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "force_arrow")
+        self.arrow_body = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, f"force_arrow_{arrow_idx}")
         if self.arrow_body < 0:
-            raise ValueError("No existe el body 'force_arrow' en el XML.")
+            raise ValueError(f"No existe el body 'force_arrow_{arrow_idx}' en el XML.")
         self.mocap_id = self.model.body_mocapid[self.arrow_body]
         if self.mocap_id < 0:
-            raise ValueError("'force_arrow' no es mocap. ¿Pusiste mocap='true'?")
-        self.arrow_geom = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "force_geom")
+            raise ValueError(f"'force_arrow_{arrow_idx}' no es mocap. ¿Pusiste mocap='true'?")
+        self.arrow_geom = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f"force_geom_{arrow_idx}")
         if self.arrow_geom < 0:
-            raise ValueError("No existe el geom 'force_geom' en el XML.")
+            raise ValueError(f"No existe el geom 'force_geom_{arrow_idx}' en el XML.")
         
     # Función para actualizar la flecha de fuerza en Mujoco
     def update_force_arrow_mocap(self, p0_world, F_world,
