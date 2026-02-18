@@ -287,11 +287,18 @@ class SingleMPPIPlannerTorch:
         obs_margin: float = 0.20,     # margen de seguridad para obstáculos
         obs_softness: float = 0.15,   # suavidad de la penalización de obstáculos
         goal_tolerance: float = 0.10, # distancia al goal para considerar "llegado"
+
         z_min: float = 0.5,           # altura mínima (suelo)
         z_max: float = 2.0,           # altura máxima (techo)
         z_margin: float = 0.15,       # “zona amarilla” cerca de límites
-        w_z: float = 200.0,           # peso altura durante rollout
+        w_z: float = 200.0,           # peso altura durante rollou
         w_z_terminal: float = 400.0,  # peso terminal altura
+
+        v_max: float = 5.0,            # velocidad máxima (m/s)
+        v_margin: float = 0.5,         # margen para penalizar velocidad alta
+        w_v: float = 50.0,             # peso para penalizar velocidad alta
+        w_v_terminal: float = 100.0,     # peso terminal para velocidad alta
+
         rng_seed: int = 0,
         device: str | None = None,    # "cuda" / "cpu" / None => auto
         dtype: torch.dtype = torch.float32,
@@ -332,6 +339,12 @@ class SingleMPPIPlannerTorch:
         self.z_margin = float(z_margin)
         self.w_z = float(w_z)
         self.w_z_terminal = float(w_z_terminal)
+
+        # velocidad
+        self.v_max = float(v_max)
+        self.v_margin = float(v_margin)
+        self.w_v = float(w_v)
+        self.w_v_terminal = float(w_v_terminal)
 
         # goal
         self.goal = torch.zeros(3, device=self.device, dtype=self.dtype)
@@ -453,6 +466,22 @@ class SingleMPPIPlannerTorch:
         pen = self.softplus(low) ** 2 + self.softplus(high) ** 2
         w = self.w_z_terminal if terminal else self.w_z
         return w * pen
+    
+    # ---------------------------
+    # Costo por rango de velocidad (torch)
+    # ---------------------------
+    def _velocity_cost(self, v, terminal=False):
+        """
+        Penaliza cuando ||v|| > v_max.
+        """
+        speed = torch.linalg.norm(v, dim=-1)
+
+        excess = speed - (self.v_max - self.v_margin)
+        pen = torch.nn.functional.softplus(excess) ** 2
+
+        w = self.w_v_terminal if terminal else self.w_v
+        return w * pen
+
 
     # ---------------------------
     # Dinámica discreta simple (torch)
@@ -541,6 +570,9 @@ class SingleMPPIPlannerTorch:
             # altura
             costs = costs + self._height_cost(p[:, 2], terminal=False)
 
+            # velocidad
+            costs = costs + self._velocity_cost(v, terminal=False)
+
             # dinámica
             p, v = self._step_dynamics(p, v, F)
 
@@ -561,6 +593,8 @@ class SingleMPPIPlannerTorch:
 
         # Acción receding-horizon: primer control
         F0 = self.F_nom[0].clone()
+        # Accion completa (para debug / comparación): toda la secuencia nominal antes del shift
+        F_seq = self.F_nom.clone()   # (H,3) en torch
 
         # Shift del plan (para el próximo step)
         self.F_nom = torch.roll(self.F_nom, shifts=-1, dims=0)
@@ -569,7 +603,7 @@ class SingleMPPIPlannerTorch:
         # Predicción 1-step
         p1, v1 = self._step_dynamics(p0, v0, F0)
 
-        return F0.cpu().numpy(), p1.cpu().numpy(), v1.cpu().numpy()
+        return F0.cpu().numpy(), p1.cpu().numpy(), v1.cpu().numpy(), F_seq.cpu().numpy()
 
 
 
