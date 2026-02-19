@@ -35,7 +35,7 @@
           rgba="0.9 0.5 0.1 0.7" contype="0" conaffinity="0"/>
 
     <!-- FIRST QUADROTOR 🚁 -->
-    <body name="core_1" pos="0.0 -0.3 1.0">
+    <body name="core_1" pos="0.0 -0.5 1.0">
         <geom name="core_geom_1" type="box" pos="0 0 0" quat="1 0 0 0" size=".04 .04 .02" rgba=".8 .2 0 1" mass="0.30"/>
         <joint name="root_1" type="free" damping="0" armature="0" pos="0 0 0" limited="false"/>
         
@@ -73,7 +73,7 @@
       </body>
 
     <!-- SECOND QUADROTOR 🚁 -->
-    <body name="core_2" pos="0.0 0.3 1.0">
+    <body name="core_2" pos="0.0 0.0 1.0">
         <geom name="core_geom_2" type="box" pos="0 0 0" quat="1 0 0 0" size=".04 .04 .02" rgba="0 0.2 0.8 1" mass="0.30"/>
         <joint name="root_2" type="free" damping="0" armature="0" pos="0 0 0" limited="false"/>
         
@@ -107,6 +107,41 @@
         <site name="z_axis_2" type="box" pos="0 0 0.20" size="0.003 0.003 0.20" rgba="0 0 1 0.3"/>
       </body>
 
+    <!-- THIRD QUADROTOR 🚁 -->
+    <body name="core_3" pos="0.0 0.5 1.0">
+      <geom name="core_geom_3" type="box" pos="0 0 0" quat="1 0 0 0" size=".04 .04 .02" rgba="0 0.8 0.2 1" mass="0.30"/>
+      <joint name="root_3" type="free" damping="0" armature="0" pos="0 0 0" limited="false"/>
+      
+      <!-- Site en el centro del cuerpo para aplicar wrench (u1,u2,u3,u4) -->
+      <site name="com_site_3" pos="0 0 0" size="0.006" rgba="1 0 0 1"/>
+      
+      <geom name="arm_front_3" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
+      <geom name="arm_back_3" type="box" pos="-0.10 0 0" size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
+      <geom name="arm_left_3" type="box" pos="0  0.10 0" size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
+      <geom name="arm_right_3" type="box" pos="0 -0.10 0" size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1" mass="0.02"/>
+
+      <body name="arm_front_3" pos=" 0.16  0.00 0.03">
+        <geom type="cylinder" size="0.03 0.003" rgba="0.3 1 0.3 0.6"/>
+        <site name="motor0_3" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+      </body>
+      <body name="arm_back_3" pos="-0.16  0.00 0.03">
+        <geom type="cylinder" size="0.03 0.003" rgba="0.3 1 0.3 0.6"/>
+        <site name="motor1_3" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+      </body>
+      <body name="arm_left_3" pos=" 0.00  0.16 0.03">
+        <geom type="cylinder" size="0.03 0.003" rgba="0.3 1 0.3 0.6"/>
+        <site name="motor2_3" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+      </body>
+      <body name="arm_right_3" pos=" 0.00 -0.16 0.03">
+        <geom type="cylinder" size="0.03 0.003" rgba="0.3 1 0.3 0.6"/>
+        <site name="motor3_3" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+      </body>
+
+      <site name="x_axis_3" type="box" pos="0.20 0 0" size="0.20 0.003 0.003" rgba="1 0 0 0.3"/>
+      <site name="y_axis_3" type="box" pos="0 0.20 0" size="0.003 0.20 0.003" rgba="0 1 0 0.3"/>
+      <site name="z_axis_3" type="box" pos="0 0 0.20" size="0.003 0.003 0.20" rgba="0 0 1 0.3"/>
+    </body>
+
     <!-- Flecha visual 1 (mocap) para mostrar F_des1 -->
     <body name="force_arrow_1" mocap="true" pos="0 0 0">
       <geom name="force_geom_1"
@@ -121,6 +156,17 @@
     <!-- Flecha visual 2 (mocap) para mostrar F_des2 -->
     <body name="force_arrow_2" mocap="true" pos="0 0 0">
       <geom name="force_geom_2"
+            type="capsule"
+            size="0.01 0.10"
+            rgba="1 0 0 1"
+            contype="0"
+            conaffinity="0"
+            mass="0"/>
+    </body>
+
+    <!-- Flecha visual 3 (mocap) para mostrar F_des3 -->
+    <body name="force_arrow_3" mocap="true" pos="0 0 0">
+      <geom name="force_geom_3"
             type="capsule"
             size="0.01 0.10"
             rgba="1 0 0 1"
@@ -170,6 +216,26 @@
       <general name="u4_tau_z_2" site="com_site_2"
               ctrllimited="true" ctrlrange="-0.2 0.2"
               gear="0 0 0  0 0 1"/>
+      
+
+      <!-- ========================= -->
+      <!-- DRON 3: u1,u2,u3,u4 -->
+      <!-- ========================= -->
+      <general name="u1_thrust_3" site="com_site_3"
+              ctrllimited="true" ctrlrange="0 10"
+              gear="0 0 1  0 0 0"/>
+
+      <general name="u2_tau_x_3" site="com_site_3"
+              ctrllimited="true" ctrlrange="-1 1"
+              gear="0 0 0  1 0 0"/>
+
+      <general name="u3_tau_y_3" site="com_site_3"
+              ctrllimited="true" ctrlrange="-1 1"
+              gear="0 0 0  0 1 0"/>
+
+      <general name="u4_tau_z_3" site="com_site_3"
+              ctrllimited="true" ctrlrange="-0.2 0.2"
+              gear="0 0 0  0 0 1"/>
   </actuator>
 
   <sensor>
@@ -180,5 +246,9 @@
       <!-- Segundo dron -->
       <framepos  name="pos_core_2"  objtype="body" objname="core_2"/>
       <framequat name="quat_core_2" objtype="body" objname="core_2"/>
+
+      <!-- Tercer dron -->
+      <framepos  name="pos_core_3"  objtype="body" objname="core_3"/>
+      <framequat name="quat_core_3" objtype="body" objname="core_3"/>
   </sensor>
 </mujoco>
