@@ -16,7 +16,7 @@ class SingleMassDynamicModel:
         
         a = (action + self.mg) / self.mass
         new_vel = vel + a * self.dt  # Update velocities
-        new_pos = pos + vel * self.dt# + 0.5 * a * self.dt**2  # Update positions
+        new_pos = pos + vel * self.dt + 0.5 * a * self.dt**2  # Update positions
         # uncertainty variance (simple model, could be more complex)
         pos_var = 0.01 * np.eye(3)  # Variance en posición
         vel_var = 0.01 * np.eye(3)  # Variance en velocidad
