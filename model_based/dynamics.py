@@ -236,6 +236,134 @@ if __name__ == "__main__":
         device="cuda" if torch.cuda.is_available() else "cpu",
     )
 
+#................................................................
+#-----------------------------REVISAR----------------------------
+#................................................................
+
+
+##############################################################################
+################### Dinámica aprendida por SVGP para 2 drones ################
+##############################################################################
+
+import torch
+import numpy as np
+from SVGP import MultiOutputSVGP
+
+class LearnedTwoDroneDynamicsDeltaSVGP:
+    """
+    Dinámica aprendida por SVGP que predice:
+      (p1,p2,v1,v2,F1,F2) -> (Δp1,Δp2,Δv1,Δv2)
+
+    Luego:
+      p_next = p + Δp
+      v_next = v + Δv
+
+    Compatible con MPPI:
+      pos: (2,3) o (K,2,3)
+      vel: (2,3) o (K,2,3)
+      F  : (2,3) o (K,2,3)
+    """
+
+    def __init__(
+        self,
+        dt: float,
+        mogp: MultiOutputSVGP,     # out_dim=12
+        device: str = "cuda",
+        dtype: torch.dtype = torch.float32,
+        use_sampling: bool = False,
+        var_clip: float = 1e2,
+        rng_seed: int = 0,
+        # opcional: “filtro” suave SOLO para evitar explosiones numéricas del GP
+        dp_clip: float | None = None,   # m por step
+        dv_clip: float | None = None,   # m/s por step
+    ):
+        self.dt = float(dt)
+        self.mogp = mogp
+        self.device = torch.device(device)
+        self.dtype = dtype
+        self.use_sampling = bool(use_sampling)
+        self.var_clip = float(var_clip)
+        self.dp_clip = dp_clip
+        self.dv_clip = dv_clip
+
+        self.gen = torch.Generator(device=self.device)
+        self.gen.manual_seed(int(rng_seed))
+
+    def _to_torch(self, x):
+        if isinstance(x, torch.Tensor):
+            return x.to(self.device, dtype=self.dtype)
+        return torch.as_tensor(x, device=self.device, dtype=self.dtype)
+
+    def _make_features(self, p, v, F):
+        """
+        p,v,F: (B,2,3) -> X: (B,18)
+        [p1,p2,v1,v2,F1,F2]
+        """
+        B = p.shape[0]
+        return torch.cat([p.reshape(B, 6), v.reshape(B, 6), F.reshape(B, 6)], dim=-1)
+
+    @torch.no_grad()
+    def step(self, pos, vel, action_F):
+        pos = self._to_torch(pos)
+        vel = self._to_torch(vel)
+        F   = self._to_torch(action_F)
+
+        batched = (pos.ndim == 3)
+        if not batched:
+            pos = pos.unsqueeze(0)
+            vel = vel.unsqueeze(0)
+            F   = F.unsqueeze(0)
+
+        B = pos.shape[0]
+        assert pos.shape[1:] == (2, 3)
+        assert vel.shape[1:] == (2, 3)
+        assert F.shape[1:] == (2, 3)
+
+        X = self._make_features(pos, vel, F)          # (B,18)
+        mean, var = self.mogp.predict_torch(X)        # (B,12)
+
+        if self.use_sampling:
+            var = torch.clamp(var, 0.0, self.var_clip)
+            eps = torch.randn_like(mean, generator=self.gen)
+            Y = mean + eps * torch.sqrt(var + 1e-9)
+        else:
+            Y = mean
+
+        dP = Y[:, 0:6].reshape(B, 2, 3)
+        dV = Y[:, 6:12].reshape(B, 2, 3)
+
+        # safety clamps (opcional, recomendado al inicio)
+        if self.dp_clip is not None:
+            dP = torch.clamp(dP, -float(self.dp_clip), float(self.dp_clip))
+        if self.dv_clip is not None:
+            dV = torch.clamp(dV, -float(self.dv_clip), float(self.dv_clip))
+
+        new_pos = pos + dP
+        new_vel = vel + dV
+
+        if not batched:
+            return new_pos.squeeze(0), new_vel.squeeze(0)
+        return new_pos, new_vel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
