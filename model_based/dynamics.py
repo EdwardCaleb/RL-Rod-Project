@@ -50,311 +50,41 @@ class SingleMassDynamicModelTorch:
 
 
 
+class SVGPDroneDynamicModel:
+    def __init__(self, dt=0.1):
+        self.dt = dt
+        self.model = None  # Aquí se almacenará el modelo SVGPDynamics entrenado
+    
+    def step(self, pos, vel, action):
+        # predict next state using SVGPDynamics
+        # pos, vel: (3,) numpy arrays
+        # action: (3,) numpy array of forces
+        # returns new_pos, new_vel, pos_var, vel_var
+        pass
+    
+    def train(self, data):
+        # train the SVGPDynamics model on collected data
+        # data: list of (pos, vel, action, new_pos, new_vel) tuples
+        pass
 
-##############################################################################
-##############################################################################
-###################### Multi Modelo dinámico con TORCH #######################
-##############################################################################
-##############################################################################
-import torch
+    def add_data(self, pos, vel, action, new_pos, new_vel):
+        # add a new data point to the training dataset
+        pass
 
+    def save_data(self, path):
+        # save collected data to file
+        pass
 
-class MultiBodySpringDamperDynamicsTorch:
-    """
-    Dinámica multi-body (N puntos-masa) con resortes/amortiguadores entre pares (edges).
-    Todo en Torch (GPU friendly) y vectorizado en batch.
+    def load_model(self, path):
+        # load model parameters from file
+        pass
 
-    Estado:
-      p: (..., N, 3)   posiciones WORLD
-      v: (..., N, 3)   velocidades WORLD
-    Acción:
-      F_ext: (..., N, 3) fuerzas externas WORLD (ej: MPPI por dron)
-
-    Fuerzas internas (por edge i<->j):
-      F_spring = k * (dist - L0) * dir
-      F_damp   = c * ( (v_j - v_i) · dir ) * dir
-      F_ij = (F_spring + F_damp)  aplicada a i (hacia j)
-      F_ji = -F_ij aplicada a j
-
-    Integración:
-      a = (F_ext + F_internal + m*g)/m
-      v_next = v + a*dt
-      p_next = p + v*dt + 0.5*a*dt^2
-
-    Escalable: N=2,3,... y batch K rollouts: p.shape puede ser (K,N,3).
-    """
-
-    def __init__(
-        self,
-        dt: float,
-        mass: float | torch.Tensor,
-        edges: list[tuple[int, int]],
-        k: float | torch.Tensor = 20.0,         # stiffness (N/m)
-        c: float | torch.Tensor = 2.0,          # damping (N*s/m)
-        rest_length: float | torch.Tensor = 0.5,# L0 (m)
-        gravity: float = 9.81,
-        device: str | torch.device = "cuda",
-        dtype: torch.dtype = torch.float32,
-        eps: float = 1e-8,
-    ):
-        self.dt = float(dt)
-        self.device = torch.device(device)
-        self.dtype = dtype
-        self.eps = float(eps)
-
-        # masa: escalar o (N,)
-        self.mass = torch.as_tensor(mass, device=self.device, dtype=self.dtype)
-        self.g = torch.tensor([0.0, 0.0, -float(gravity)], device=self.device, dtype=self.dtype)
-
-        # edges -> tensores (E,)
-        if len(edges) == 0:
-            raise ValueError("edges no puede estar vacío (define al menos un resorte).")
-        ii, jj = zip(*edges)
-        self.i = torch.tensor(ii, device=self.device, dtype=torch.long)
-        self.j = torch.tensor(jj, device=self.device, dtype=torch.long)
-        self.E = self.i.numel()
-
-        # parámetros por edge: escalar o (E,)
-        self.k = torch.as_tensor(k, device=self.device, dtype=self.dtype)
-        self.c = torch.as_tensor(c, device=self.device, dtype=self.dtype)
-        self.L0 = torch.as_tensor(rest_length, device=self.device, dtype=self.dtype)
-
-        # los dejamos listos para broadcast por-edge
-        if self.k.ndim == 0:  self.k = self.k.repeat(self.E)
-        if self.c.ndim == 0:  self.c = self.c.repeat(self.E)
-        if self.L0.ndim == 0: self.L0 = self.L0.repeat(self.E)
-
-    @torch.no_grad()
-    def step(self, pos, vel, action_F):
-        """
-        pos, vel, action_F pueden ser:
-          - (N,3)
-          - (K,N,3)
-
-        Devuelve:
-          new_pos, new_vel
-        """
-        pos = self._to_torch(pos)
-        vel = self._to_torch(vel)
-        Fext = self._to_torch(action_F)
-
-        # soporta (N,3) y (K,N,3)
-        batched = (pos.ndim == 3)
-        if not batched:
-            pos = pos.unsqueeze(0)  # (1,N,3)
-            vel = vel.unsqueeze(0)
-            Fext = Fext.unsqueeze(0)
-
-        B, N, _ = pos.shape
-
-        # masa -> (1,N,1) para broadcast
-        if self.mass.ndim == 0:
-            m = self.mass.view(1, 1, 1)
-        else:
-            # (N,) -> (1,N,1)
-            m = self.mass.view(1, N, 1)
-
-        # -------------------------
-        # Fuerzas internas por edges (vectorizado)
-        # -------------------------
-        pi = pos[:, self.i, :]   # (B,E,3)
-        pj = pos[:, self.j, :]   # (B,E,3)
-        vi = vel[:, self.i, :]
-        vj = vel[:, self.j, :]
-
-        d = pj - pi                              # (B,E,3)
-        dist = torch.linalg.norm(d, dim=-1)      # (B,E)
-        dir_ = d / (dist.unsqueeze(-1) + self.eps)
-
-        # spring: k*(dist-L0)
-        stretch = dist - self.L0.view(1, self.E)                   # (B,E)
-        F_s = (self.k.view(1, self.E) * stretch).unsqueeze(-1) * dir_  # (B,E,3)
-
-        # damping: c*((v_rel · dir) ) dir
-        vrel = vj - vi
-        vrel_along = (vrel * dir_).sum(dim=-1)                     # (B,E)
-        F_d = (self.c.view(1, self.E) * vrel_along).unsqueeze(-1) * dir_  # (B,E,3)
-
-        F_edge = F_s + F_d                                         # fuerza sobre i hacia j (B,E,3)
-
-        # -------------------------
-        # Acumular fuerzas a nodos con scatter/index_add
-        # -------------------------
-        Fint = torch.zeros((B, N, 3), device=self.device, dtype=self.dtype)
-
-        # sumar a i: +F_edge
-        Fint.index_add_(1, self.i, F_edge)
-        # sumar a j: -F_edge
-        Fint.index_add_(1, self.j, -F_edge)
-
-        # -------------------------
-        # Aceleración total + integración
-        # -------------------------
-        # gravedad en fuerza: m*g
-        Fg = m * self.g.view(1, 1, 3)            # (B,N,3) por broadcast
-
-        Ftot = Fext + Fint + Fg
-        a = Ftot / m
-
-        dt = self.dt
-        new_vel = vel + a * dt
-        new_pos = pos + vel * dt + 0.5 * a * (dt * dt)
-
-        if not batched:
-            return new_pos.squeeze(0), new_vel.squeeze(0)
-        return new_pos, new_vel
-
-    def _to_torch(self, x):
-        if isinstance(x, torch.Tensor):
-            return x.to(device=self.device, dtype=self.dtype)
-        return torch.as_tensor(x, device=self.device, dtype=self.dtype)
+    def save_model(self, path):
+        # save model parameters to file
+        pass
 
 
-# -------------------------
-# Ejemplos de uso
-# -------------------------
-if __name__ == "__main__":
-    # 2 cuerpos unidos
-    dyn2 = MultiBodySpringDamperDynamicsTorch(
-        dt=0.01,
-        mass=0.3,
-        edges=[(0, 1)],
-        k=30.0,
-        c=3.0,
-        rest_length=0.5,
-        device="cuda" if torch.cuda.is_available() else "cpu",
-    )
-
-    # 3 cuerpos en cadena 0-1-2
-    dyn3 = MultiBodySpringDamperDynamicsTorch(
-        dt=0.01,
-        mass=torch.tensor([0.3, 0.3, 0.3]),
-        edges=[(0, 1), (1, 2)],
-        k=torch.tensor([30.0, 30.0]),
-        c=torch.tensor([3.0, 3.0]),
-        rest_length=torch.tensor([0.5, 0.5]),
-        device="cuda" if torch.cuda.is_available() else "cpu",
-    )
-
-#................................................................
-#-----------------------------REVISAR----------------------------
-#................................................................
-
-
-##############################################################################
-################### Dinámica aprendida por SVGP para 2 drones ################
-##############################################################################
-
-import torch
-import numpy as np
-from SVGP import MultiOutputSVGP
-
-class LearnedTwoDroneDynamicsDeltaSVGP:
-    """
-    Dinámica aprendida por SVGP que predice:
-      (p1,p2,v1,v2,F1,F2) -> (Δp1,Δp2,Δv1,Δv2)
-
-    Luego:
-      p_next = p + Δp
-      v_next = v + Δv
-
-    Compatible con MPPI:
-      pos: (2,3) o (K,2,3)
-      vel: (2,3) o (K,2,3)
-      F  : (2,3) o (K,2,3)
-    """
-
-    def __init__(
-        self,
-        dt: float,
-        mogp: MultiOutputSVGP,     # out_dim=12
-        device: str = "cuda",
-        dtype: torch.dtype = torch.float32,
-        use_sampling: bool = False,
-        var_clip: float = 1e2,
-        rng_seed: int = 0,
-        # opcional: “filtro” suave SOLO para evitar explosiones numéricas del GP
-        dp_clip: float | None = None,   # m por step
-        dv_clip: float | None = None,   # m/s por step
-    ):
-        self.dt = float(dt)
-        self.mogp = mogp
-        self.device = torch.device(device)
-        self.dtype = dtype
-        self.use_sampling = bool(use_sampling)
-        self.var_clip = float(var_clip)
-        self.dp_clip = dp_clip
-        self.dv_clip = dv_clip
-
-        self.gen = torch.Generator(device=self.device)
-        self.gen.manual_seed(int(rng_seed))
-
-    def _to_torch(self, x):
-        if isinstance(x, torch.Tensor):
-            return x.to(self.device, dtype=self.dtype)
-        return torch.as_tensor(x, device=self.device, dtype=self.dtype)
-
-    def _make_features(self, p, v, F):
-        """
-        p,v,F: (B,2,3) -> X: (B,18)
-        [p1,p2,v1,v2,F1,F2]
-        """
-        B = p.shape[0]
-        return torch.cat([p.reshape(B, 6), v.reshape(B, 6), F.reshape(B, 6)], dim=-1)
-
-    @torch.no_grad()
-    def step(self, pos, vel, action_F):
-        pos = self._to_torch(pos)
-        vel = self._to_torch(vel)
-        F   = self._to_torch(action_F)
-
-        batched = (pos.ndim == 3)
-        if not batched:
-            pos = pos.unsqueeze(0)
-            vel = vel.unsqueeze(0)
-            F   = F.unsqueeze(0)
-
-        B = pos.shape[0]
-        assert pos.shape[1:] == (2, 3)
-        assert vel.shape[1:] == (2, 3)
-        assert F.shape[1:] == (2, 3)
-
-        X = self._make_features(pos, vel, F)          # (B,18)
-        mean, var = self.mogp.predict_torch(X)        # (B,12)
-
-        if self.use_sampling:
-            var = torch.clamp(var, 0.0, self.var_clip)
-            eps = torch.randn_like(mean, generator=self.gen)
-            Y = mean + eps * torch.sqrt(var + 1e-9)
-        else:
-            Y = mean
-
-        dP = Y[:, 0:6].reshape(B, 2, 3)
-        dV = Y[:, 6:12].reshape(B, 2, 3)
-
-        # safety clamps (opcional, recomendado al inicio)
-        if self.dp_clip is not None:
-            dP = torch.clamp(dP, -float(self.dp_clip), float(self.dp_clip))
-        if self.dv_clip is not None:
-            dV = torch.clamp(dV, -float(self.dv_clip), float(self.dv_clip))
-
-        new_pos = pos + dP
-        new_vel = vel + dV
-
-        if not batched:
-            return new_pos.squeeze(0), new_vel.squeeze(0)
-        return new_pos, new_vel
-
-
-
-
-
-
-
-
-
-
-
+    
 
 
 

@@ -56,3 +56,30 @@ class ForceArrow:
         # Ajusta tamaño del capsule (radius, half_length)
         self.model.geom_size[self.arrow_geom][0] = float(radius)
         self.model.geom_size[self.arrow_geom][1] = float(length * 0.5)
+
+
+
+
+
+
+def enforce_tilt_and_thrust_limits(F, u1_max, tilt_max_rad):
+    Fx, Fy, Fz = float(F[0]), float(F[1]), float(F[2])
+
+    # thrust no negativo
+    Fz = max(Fz, 1e-3)
+
+    # tilt limit: ||Fxy|| <= Fz * tan(tilt_max)
+    Fxy = np.array([Fx, Fy], dtype=float)
+    nxy = np.linalg.norm(Fxy)
+    max_xy = Fz * np.tan(tilt_max_rad)
+    if nxy > max_xy and nxy > 1e-9:
+        Fxy *= (max_xy / nxy)
+
+    F2 = np.array([Fxy[0], Fxy[1], Fz], dtype=float)
+
+    # thrust magnitude limit (total)
+    nF = np.linalg.norm(F2)
+    if nF > u1_max and nF > 1e-9:
+        F2 *= (u1_max / nF)
+
+    return F2

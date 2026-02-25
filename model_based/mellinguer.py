@@ -241,7 +241,7 @@ if __name__ == "__main__":
 
 # Mellinguer modified, only force as input
 
-class MellinguerControllerModified:
+class MellinguerControllerForce:
     def __init__(self, mass, gravity, gains):      
         self.mass = mass
         self.gravity = gravity
