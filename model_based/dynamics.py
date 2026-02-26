@@ -21,6 +21,32 @@ class SingleMassDynamicModel:
         pos_var = 0.01 * np.eye(3)  # Variance en posición
         vel_var = 0.01 * np.eye(3)  # Variance en velocidad
         return new_pos, new_vel, pos_var, vel_var
+    
+
+
+
+class DoubleMassDynamicModel:
+    def __init__(self, dt=0.1, mass1=1.0, mass2=1.0):
+        self.dt = dt
+        self.mass1 = mass1
+        self.mass2 = mass2
+        self.mg1 = np.array([0.0, 0.0, -9.81 * self.mass1])  # Gravedad
+        self.mg2 = np.array([0.0, 0.0, -9.81 * self.mass2])  # Gravedad
+    
+    def step(self, pos, vel, action1, action2):
+        # pos: [x, y, z]
+        # vel: [vx, vy, vz]
+        # action: [Fx, Fy, Fz]
+        
+        a1 = (action1 + self.mg1) / self.mass1
+        a2 = (action2 + self.mg2) / self.mass2
+        a = np.concatenate([a1, a2], axis=0)  # (6,)
+        new_vel = vel + a * self.dt  # Update velocities
+        new_pos = pos + vel * self.dt + 0.5 * a * self.dt**2  # Update positions
+        # uncertainty variance (simple model, could be more complex)
+        pos_var = 0.01 * np.eye(3)  # Variance en posición
+        vel_var = 0.01 * np.eye(3)  # Variance en velocidad
+        return new_pos, new_vel, pos_var, vel_var
 
 
 ##############################################################################
@@ -47,6 +73,26 @@ class SingleMassDynamicModelTorch:
         new_pos = pos + vel * self.dt + 0.5 * a * (self.dt ** 2)
         return new_pos, new_vel
 
+
+class DoubleMassDynamicModelTorch:
+    def __init__(self, dt=0.1, mass1=1.0, mass2=1.0, device="cuda", dtype=torch.float32):
+        self.dt = float(dt)
+        self.mass1 = float(mass1)
+        self.mass2 = float(mass2)
+        self.device = torch.device(device)
+        self.dtype = dtype
+        self.mg1 = torch.tensor([0.0, 0.0, -9.81 * self.mass1], device=self.device, dtype=self.dtype)
+        self.mg2 = torch.tensor([0.0, 0.0, -9.81 * self.mass2], device=self.device, dtype=self.dtype)
+
+    @torch.no_grad()
+    def step(self, pos, vel, action1, action2):
+        # pos, vel, action pueden ser (3,) o (K,3)
+        a1 = (action1 + self.mg1) / self.mass1
+        a2 = (action2 + self.mg2) / self.mass2
+        a = torch.cat([a1, a2], dim=-1)  # (6,)
+        new_vel = vel + a * self.dt
+        new_pos = pos + vel * self.dt + 0.5 * a * (self.dt ** 2)
+        return new_pos, new_vel
 
 
 
@@ -417,6 +463,380 @@ class SVGPDroneDynamicModel:
 
     
 
+
+
+
+
+
+
+###################################################################################################
+###################################################################################################
+########################### 2 Drones - Modelo dinámico con SVGP ###################################
+###################################################################################################
+###################################################################################################
+
+
+
+import os
+import numpy as np
+import torch
+
+# Reusa tu OnlineSVGP1D (y por debajo SparseGPModel, gpytorch, etc.)
+# from your_svgp_module import OnlineSVGP1D
+
+
+class SVGPDoubleDroneDynamicModel:
+    """
+    Two-drone dynamics model (translational only):
+
+    State:
+      X = [p1(3), v1(3), p2(3), v2(3)]  (12)
+    Action:
+      U = [F1(3), F2(3)]  (6)
+
+    GP input:
+      Z = [Xprev(12), U(6)]  (18)
+    GP target:
+      dX = Xnext - Xprev  (12)
+
+    Uses 12 independent 1D SVGPs.
+    """
+
+    def __init__(
+        self,
+        dt: float = 0.1,
+        mass1: float = 1.0,
+        mass2: float = 1.0,
+        gravity: float = 9.81,
+        device: str | None = None,
+        dtype: torch.dtype = torch.float32,
+
+        # GP hyperparams
+        kernel: str = "RBF",
+        lr: float = 0.01,
+        batch_size: int = 256,
+        num_inducing: int = 256,
+        init_train_steps: int = 800,
+
+        # Online schedule
+        train_every: int = 20,
+        online_steps: int = 50,
+        min_points_to_train: int = 300,
+
+        reset_each_episode: bool = False,
+    ):
+        self.dt = float(dt)
+        self.m1 = float(mass1)
+        self.m2 = float(mass2)
+        self.g = float(gravity)
+
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.dtype = dtype
+
+        self.input_dim = 18
+        self.out_dim = 12
+
+        self.kernel = kernel
+        self.lr = lr
+        self.batch_size = batch_size
+        self.num_inducing = num_inducing
+        self.init_train_steps = init_train_steps
+
+        self.train_every = int(train_every)
+        self.online_steps = int(online_steps)
+        self.min_points_to_train = int(min_points_to_train)
+        self.reset_each_episode = bool(reset_each_episode)
+
+        self.gps = [
+            OnlineSVGP1D(
+                input_dim=self.input_dim,
+                kernel=self.kernel,
+                lr=self.lr,
+                batch_size=self.batch_size,
+                num_inducing=self.num_inducing,
+                init_train_steps=self.init_train_steps,
+                device=self.device,
+                dtype=self.dtype,
+            )
+            for _ in range(self.out_dim)
+        ]
+
+        # buffers (numpy)
+        self.Z_buf = []   # (18,)
+        self.dX_buf = []  # (12,)
+
+        self._step_counter = 0
+        self._trained_once = False
+
+    # -------------------- utils --------------------
+    def _make_X(self, p1, v1, p2, v2) -> np.ndarray:
+        p1 = np.asarray(p1, float).reshape(3,)
+        v1 = np.asarray(v1, float).reshape(3,)
+        p2 = np.asarray(p2, float).reshape(3,)
+        v2 = np.asarray(v2, float).reshape(3,)
+        return np.concatenate([p1, v1, p2, v2], axis=0)  # (12,)
+
+    def _make_U(self, F1, F2) -> np.ndarray:
+        F1 = np.asarray(F1, float).reshape(3,)
+        F2 = np.asarray(F2, float).reshape(3,)
+        return np.concatenate([F1, F2], axis=0)  # (6,)
+
+    def _make_Z(self, p1, v1, p2, v2, F1, F2) -> np.ndarray:
+        X = self._make_X(p1, v1, p2, v2)
+        U = self._make_U(F1, F2)
+        return np.concatenate([X, U], axis=0)  # (18,)
+
+    def _fallback_step_numpy(self, p1, v1, p2, v2, F1, F2):
+        """
+        Two independent point-masses with gravity.
+        """
+        p1 = np.asarray(p1, float).reshape(3,)
+        v1 = np.asarray(v1, float).reshape(3,)
+        p2 = np.asarray(p2, float).reshape(3,)
+        v2 = np.asarray(v2, float).reshape(3,)
+        F1 = np.asarray(F1, float).reshape(3,)
+        F2 = np.asarray(F2, float).reshape(3,)
+
+        a1 = (F1 + np.array([0.0, 0.0, -self.m1 * self.g])) / self.m1
+        a2 = (F2 + np.array([0.0, 0.0, -self.m2 * self.g])) / self.m2
+
+        v1n = v1 + a1 * self.dt
+        p1n = p1 + v1 * self.dt + 0.5 * a1 * (self.dt ** 2)
+
+        v2n = v2 + a2 * self.dt
+        p2n = p2 + v2 * self.dt + 0.5 * a2 * (self.dt ** 2)
+
+        # simple small variance fallback
+        pvar1 = np.ones(3) * 1e-3
+        vvar1 = np.ones(3) * 1e-3
+        pvar2 = np.ones(3) * 1e-3
+        vvar2 = np.ones(3) * 1e-3
+        return p1n, v1n, p2n, v2n, pvar1, vvar1, pvar2, vvar2
+
+    # -------------------- public API (numpy) --------------------
+    def step(self, p1, v1, p2, v2, F1, F2):
+        """
+        Returns:
+          p1n, v1n, p2n, v2n, pvar1(3), vvar1(3), pvar2(3), vvar2(3)
+        """
+        if (not self._trained_once) or (not all(gp.trained for gp in self.gps)):
+            return self._fallback_step_numpy(p1, v1, p2, v2, F1, F2)
+
+        Z = self._make_Z(p1, v1, p2, v2, F1, F2).astype(np.float32)
+        Zt = torch.as_tensor(Z[None, :], device=self.device, dtype=self.dtype)  # (1,18)
+
+        dX_mean = np.zeros(12, dtype=float)
+        dX_var = np.zeros(12, dtype=float)
+        for i in range(12):
+            m, v = self.gps[i].predict_torch(Zt)
+            dX_mean[i] = float(m.item())
+            dX_var[i] = float(v.item())
+
+        X = self._make_X(p1, v1, p2, v2)
+        Xn = X + dX_mean
+
+        p1n, v1n = Xn[0:3],  Xn[3:6]
+        p2n, v2n = Xn[6:9],  Xn[9:12]
+
+        pvar1, vvar1 = dX_var[0:3], dX_var[3:6]
+        pvar2, vvar2 = dX_var[6:9], dX_var[9:12]
+        return p1n, v1n, p2n, v2n, pvar1, vvar1, pvar2, vvar2
+
+    def add_transition(self, p1, v1, p2, v2, F1, F2, p1n, v1n, p2n, v2n, train_online: bool = True):
+        """
+        Store transition (Z -> dX).
+        """
+        Z = self._make_Z(p1, v1, p2, v2, F1, F2).astype(np.float32)
+        X0 = self._make_X(p1, v1, p2, v2).astype(np.float32)
+        X1 = self._make_X(p1n, v1n, p2n, v2n).astype(np.float32)
+        dX = (X1 - X0).astype(np.float32)
+
+        self.Z_buf.append(Z)
+        self.dX_buf.append(dX)
+        self._step_counter += 1
+
+        if not train_online:
+            return
+
+        if (self._step_counter % self.train_every) == 0 and len(self.Z_buf) >= self.min_points_to_train:
+            self.train_online(steps=self.online_steps)
+
+    def train_full(self):
+        if len(self.Z_buf) < self.min_points_to_train:
+            return
+        Z = np.stack(self.Z_buf, axis=0)   # (N,18)
+        dX = np.stack(self.dX_buf, axis=0) # (N,12)
+        for i in range(12):
+            self.gps[i].fit(Z, dX[:, i])
+        self._trained_once = True
+
+    def train_online(self, steps: int | None = None):
+        if len(self.Z_buf) < self.min_points_to_train:
+            return
+        steps = int(self.online_steps if steps is None else steps)
+
+        # update with recent window (cheap)
+        window = min(5 * self.train_every, len(self.Z_buf))
+        Z_new = np.stack(self.Z_buf[-window:], axis=0)    # (W,18)
+        dX_new = np.stack(self.dX_buf[-window:], axis=0)  # (W,12)
+
+        if not self._trained_once:
+            self.train_full()
+            return
+
+        for i in range(12):
+            self.gps[i].add_data(Z_new, dX_new[:, i], online_steps=steps)
+        self._trained_once = True
+
+    def reset_episode(self, clear_buffers: bool = False):
+        self._step_counter = 0
+        if clear_buffers:
+            self.Z_buf.clear()
+            self.dX_buf.clear()
+
+        if self.reset_each_episode:
+            self.gps = [
+                OnlineSVGP1D(
+                    input_dim=self.input_dim,
+                    kernel=self.kernel,
+                    lr=self.lr,
+                    batch_size=self.batch_size,
+                    num_inducing=self.num_inducing,
+                    init_train_steps=self.init_train_steps,
+                    device=self.device,
+                    dtype=self.dtype,
+                )
+                for _ in range(self.out_dim)
+            ]
+            self._trained_once = False
+
+    # -------------------- persistence --------------------
+    def save_rollouts(self, path: str):
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        if len(self.Z_buf) == 0:
+            np.savez(path, Z=np.zeros((0, 18), np.float32), dX=np.zeros((0, 12), np.float32))
+            return
+        np.savez(path, Z=np.stack(self.Z_buf, 0), dX=np.stack(self.dX_buf, 0))
+
+    def load_rollouts(self, path: str, append: bool = True):
+        data = np.load(path)
+        Z = data["Z"].astype(np.float32)
+        dX = data["dX"].astype(np.float32)
+        if Z.shape[1] != 18 or dX.shape[1] != 12 or Z.shape[0] != dX.shape[0]:
+            raise ValueError(f"Bad rollout shapes: Z{Z.shape}, dX{dX.shape}")
+
+        if not append:
+            self.Z_buf, self.dX_buf = [], []
+
+        for i in range(Z.shape[0]):
+            self.Z_buf.append(Z[i])
+            self.dX_buf.append(dX[i])
+
+    def save_model(self, path: str):
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        bundle = {
+            "dt": self.dt,
+            "m1": self.m1,
+            "m2": self.m2,
+            "g": self.g,
+            "device": self.device,
+            "dtype": str(self.dtype),
+            "kernel": self.kernel,
+            "lr": self.lr,
+            "batch_size": self.batch_size,
+            "num_inducing": self.num_inducing,
+            "init_train_steps": self.init_train_steps,
+            "train_every": self.train_every,
+            "online_steps": self.online_steps,
+            "min_points_to_train": self.min_points_to_train,
+            "reset_each_episode": self.reset_each_episode,
+            "_trained_once": self._trained_once,
+            "gps": [gp.state_dict_bundle() for gp in self.gps],
+        }
+        torch.save(bundle, path)
+
+    def load_model(self, path: str, map_location: str | None = None):
+        bundle = torch.load(path, map_location=map_location or "cpu")
+        self.dt = float(bundle["dt"])
+        self.m1 = float(bundle["m1"])
+        self.m2 = float(bundle["m2"])
+        self.g = float(bundle["g"])
+        self.kernel = bundle["kernel"]
+        self.lr = float(bundle["lr"])
+        self.batch_size = int(bundle["batch_size"])
+        self.num_inducing = int(bundle["num_inducing"])
+        self.init_train_steps = int(bundle["init_train_steps"])
+        self.train_every = int(bundle["train_every"])
+        self.online_steps = int(bundle["online_steps"])
+        self.min_points_to_train = int(bundle["min_points_to_train"])
+        self.reset_each_episode = bool(bundle["reset_each_episode"])
+        self._trained_once = bool(bundle.get("_trained_once", False))
+
+        # rebuild gps
+        self.gps = [
+            OnlineSVGP1D(
+                input_dim=self.input_dim,
+                kernel=self.kernel,
+                lr=self.lr,
+                batch_size=self.batch_size,
+                num_inducing=self.num_inducing,
+                init_train_steps=self.init_train_steps,
+                device=self.device,
+                dtype=self.dtype,
+            )
+            for _ in range(self.out_dim)
+        ]
+        for i in range(12):
+            self.gps[i].load_from_bundle(bundle["gps"][i])
+        self._trained_once = all(gp.trained for gp in self.gps)
+
+    # -------------------- torch step for MPPI --------------------
+    @torch.no_grad()
+    def step_torch(self, X: torch.Tensor, U: torch.Tensor):
+        """
+        Torch/GPU step for MPPI rollouts.
+
+        Inputs:
+          X: (...,12) [p1,v1,p2,v2]
+          U: (..., 6) [F1,F2]
+        Returns:
+          Xnext: (...,12)
+        """
+        X = X.to(self.device, dtype=self.dtype)
+        U = U.to(self.device, dtype=self.dtype)
+
+        # fallback
+        if (not self._trained_once) or (not all(gp.trained for gp in self.gps)):
+            mg1 = torch.tensor([0.0, 0.0, -self.m1 * self.g], device=self.device, dtype=self.dtype)
+            mg2 = torch.tensor([0.0, 0.0, -self.m2 * self.g], device=self.device, dtype=self.dtype)
+
+            p1, v1 = X[..., 0:3], X[..., 3:6]
+            p2, v2 = X[..., 6:9], X[..., 9:12]
+            F1, F2 = U[..., 0:3], U[..., 3:6]
+
+            a1 = (F1 + mg1) / self.m1
+            a2 = (F2 + mg2) / self.m2
+
+            v1n = v1 + a1 * self.dt
+            p1n = p1 + v1 * self.dt + 0.5 * a1 * (self.dt ** 2)
+
+            v2n = v2 + a2 * self.dt
+            p2n = p2 + v2 * self.dt + 0.5 * a2 * (self.dt ** 2)
+
+            return torch.cat([p1n, v1n, p2n, v2n], dim=-1)
+
+        Z = torch.cat([X, U], dim=-1)          # (...,18)
+        Zflat = Z.reshape(-1, 18)              # (B,18)
+
+        dX_list = []
+        for i in range(12):
+            mi, _vi = self.gps[i].predict_torch(Zflat)  # (B,)
+            dX_list.append(mi)
+        dX = torch.stack(dX_list, dim=-1)      # (B,12)
+
+        Xnext = Zflat[:, :12] + dX             # (B,12)
+        Xnext = Xnext.reshape(*Z.shape[:-1], 12)
+        return Xnext
 
 
 

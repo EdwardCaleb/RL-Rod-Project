@@ -630,3 +630,348 @@ class SingleMPPIPlannerTorch:
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+##############################################################################################
+##############################################################################################
+############################### Double MPPI with torch #######################################
+##############################################################################################
+##############################################################################################
+
+
+
+import numpy as np
+import torch
+
+
+class DoubleMPPIPlannerTorch:
+    """
+    MPPI for 2 drones (point-mass style):
+      X = [p1(3), v1(3), p2(3), v2(3)]  (12)
+      U = [F1(3), F2(3)]               (6)
+
+    Model interface expected:
+      - if has step_torch(X,U): returns Xnext (torch)
+      - else fallback simple integrator (no gravity here; prefer to use your GP model fallback)
+    """
+
+    def __init__(
+        self,
+        dt: float = 0.01,
+        horizon: int = 40,
+        num_samples: int = 1024,
+        lambda_: float = 10.0,
+
+        noise_sigma: np.ndarray = np.array([2,2,4,  2,2,4], dtype=float),  # (6,)
+        U_min: np.ndarray = np.array([-8,-8,0,  -8,-8,0], dtype=float),
+        U_max: np.ndarray = np.array([ 8, 8,25,  8, 8,25], dtype=float),
+
+        w_goal: float = 6.0,
+        w_terminal: float = 50.0,
+        w_u: float = 0.03,
+        w_smooth: float = 0.02,
+        w_obs: float = 80.0,
+
+        # separation between drones
+        w_sep: float = 50.0,
+        sep_min: float = 0.35,
+        sep_softness: float = 0.10,
+
+        # height limits
+        z_min: float = 1.0,
+        z_max: float = 1.5,
+        z_margin: float = 0.15,
+        w_z: float = 200.0,
+        w_z_terminal: float = 400.0,
+
+        # speed limits
+        v_max: float = 5.0,
+        v_margin: float = 0.5,
+        w_v: float = 100.0,
+        w_v_terminal: float = 200.0,
+
+        obs_margin: float = 0.20,
+        obs_softness: float = 0.15,
+
+        rng_seed: int = 0,
+        device: str | None = None,
+        dtype: torch.dtype = torch.float32,
+    ):
+        self.dt = float(dt)
+        self.H = int(horizon)
+        self.K = int(num_samples)
+        self.lambda_ = float(lambda_)
+
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device(device)
+        self.dtype = dtype
+
+        self.noise_sigma = torch.as_tensor(noise_sigma.reshape(6,), device=self.device, dtype=self.dtype)
+        self.U_min = torch.as_tensor(U_min.reshape(6,), device=self.device, dtype=self.dtype)
+        self.U_max = torch.as_tensor(U_max.reshape(6,), device=self.device, dtype=self.dtype)
+
+        self.w_goal = float(w_goal)
+        self.w_terminal = float(w_terminal)
+        self.w_u = float(w_u)
+        self.w_smooth = float(w_smooth)
+        self.w_obs = float(w_obs)
+
+        self.w_sep = float(w_sep)
+        self.sep_min = float(sep_min)
+        self.sep_softness = float(sep_softness)
+
+        self.z_min = float(z_min)
+        self.z_max = float(z_max)
+        self.z_margin = float(z_margin)
+        self.w_z = float(w_z)
+        self.w_z_terminal = float(w_z_terminal)
+
+        self.v_max = float(v_max)
+        self.v_margin = float(v_margin)
+        self.w_v = float(w_v)
+        self.w_v_terminal = float(w_v_terminal)
+
+        self.obs_margin = float(obs_margin)
+        self.obs_softness = float(obs_softness)
+
+        # goals (two 3D)
+        self.goal1 = torch.zeros(3, device=self.device, dtype=self.dtype)
+        self.goal2 = torch.zeros(3, device=self.device, dtype=self.dtype)
+
+        self.model = None
+
+        # nominal control sequence (H,6)
+        self.U_nom = torch.zeros((self.H, 6), device=self.device, dtype=self.dtype)
+
+        # obstacles (same format as yours)
+        self.obstacles = []
+        self._obs_tensors_built = False
+        self._spheres_c = None
+        self._spheres_r = None
+        self._boxes_c = None
+        self._boxes_h = None
+
+        self.gen = torch.Generator(device=self.device)
+        self.gen.manual_seed(int(rng_seed))
+
+    def define_model(self, model):
+        # expects step_torch(X,U) or step(X,U)
+        self.model = model
+
+    def set_goals(self, goal1_xyz, goal2_xyz):
+        self.goal1 = torch.as_tensor(np.array(goal1_xyz, float).reshape(3,), device=self.device, dtype=self.dtype)
+        self.goal2 = torch.as_tensor(np.array(goal2_xyz, float).reshape(3,), device=self.device, dtype=self.dtype)
+
+    def set_obstacles(self, obstacles):
+        self.obstacles = obstacles
+        self._obs_tensors_built = False
+
+    # ---------------- obstacle tensors ----------------
+    def _build_obstacle_tensors(self):
+        spheres_c, spheres_r = [], []
+        boxes_c, boxes_h = [], []
+
+        for obs in self.obstacles:
+            if obs["type"] == "sphere":
+                spheres_c.append(obs["c"])
+                spheres_r.append(obs["r"])
+            elif obs["type"] == "box":
+                boxes_c.append(obs["c"])
+                boxes_h.append(obs["h"])
+
+        if spheres_c:
+            self._spheres_c = torch.as_tensor(np.array(spheres_c, float), device=self.device, dtype=self.dtype)  # (Ns,3)
+            self._spheres_r = torch.as_tensor(np.array(spheres_r, float), device=self.device, dtype=self.dtype)  # (Ns,)
+        else:
+            self._spheres_c = None
+            self._spheres_r = None
+
+        if boxes_c:
+            self._boxes_c = torch.as_tensor(np.array(boxes_c, float), device=self.device, dtype=self.dtype)  # (Nb,3)
+            self._boxes_h = torch.as_tensor(np.array(boxes_h, float), device=self.device, dtype=self.dtype)  # (Nb,3)
+        else:
+            self._boxes_c = None
+            self._boxes_h = None
+
+        self._obs_tensors_built = True
+
+    def _sphere_penalty(self, p, c, r):
+        d = torch.linalg.norm(p.unsqueeze(-2) - c, dim=-1) - (r + self.obs_margin)  # (...,Ns)
+        return torch.exp(-d / self.obs_softness)
+
+    def _box_penalty(self, p, c, h):
+        q = torch.abs(p.unsqueeze(-2) - c) - h - self.obs_margin          # (...,Nb,3)
+        outside = torch.clamp(q, min=0.0)
+        d_out = torch.linalg.norm(outside, dim=-1)                         # (...,Nb)
+        inside = (q <= 0.0).all(dim=-1)
+        pen_inside = torch.exp(torch.tensor(2.0 / self.obs_softness, device=self.device, dtype=self.dtype))
+        pen_outside = torch.exp(-d_out / self.obs_softness)
+        return torch.where(inside, pen_inside, pen_outside)
+
+    def _obstacle_cost(self, p):
+        if not self.obstacles:
+            return torch.zeros(p.shape[:-1], device=self.device, dtype=self.dtype)
+        if not self._obs_tensors_built:
+            self._build_obstacle_tensors()
+
+        cost = torch.zeros(p.shape[:-1], device=self.device, dtype=self.dtype)
+        if self._spheres_c is not None:
+            cost = cost + self._sphere_penalty(p, self._spheres_c, self._spheres_r).sum(dim=-1)
+        if self._boxes_c is not None:
+            cost = cost + self._box_penalty(p, self._boxes_c, self._boxes_h).sum(dim=-1)
+        return self.w_obs * cost
+
+    # ---------------- soft constraints ----------------
+    def softplus(self, x):
+        return torch.nn.functional.softplus(x)
+
+    def _height_cost(self, z, terminal=False):
+        low = (self.z_min + self.z_margin) - z
+        high = z - (self.z_max - self.z_margin)
+        pen = self.softplus(low) ** 2 + self.softplus(high) ** 2
+        return (self.w_z_terminal if terminal else self.w_z) * pen
+
+    def _velocity_cost(self, v, terminal=False):
+        speed = torch.linalg.norm(v, dim=-1)
+        excess = speed - (self.v_max - self.v_margin)
+        pen = torch.nn.functional.softplus(excess) ** 2
+        return (self.w_v_terminal if terminal else self.w_v) * pen
+
+    def _separation_cost(self, p1, p2):
+        """
+        Penaliza si ||p1-p2|| < sep_min (suave).
+        """
+        d = torch.linalg.norm(p1 - p2, dim=-1)
+        # positivo cuando está demasiado cerca
+        x = (self.sep_min - d) / self.sep_softness
+        pen = torch.nn.functional.softplus(x) ** 2
+        return self.w_sep * pen
+
+    def clamp_vec(self, x, lo, hi):
+        return torch.clamp(x, min=lo, max=hi)
+
+    def _step_dynamics(self, X, U):
+        """
+        X: (K,12) torch
+        U: (K, 6) torch
+        """
+        if self.model is None:
+            # fallback super simple (no gravity); prefer provide model with gravity fallback
+            X2 = X.clone()
+            # p1,v1
+            v1 = X[:, 3:6] + U[:, 0:3] * self.dt
+            p1 = X[:, 0:3] + v1 * self.dt
+            # p2,v2
+            v2 = X[:, 9:12] + U[:, 3:6] * self.dt
+            p2 = X[:, 6:9] + v2 * self.dt
+            X2[:, 0:3], X2[:, 3:6] = p1, v1
+            X2[:, 6:9], X2[:, 9:12] = p2, v2
+            return X2
+
+        if hasattr(self.model, "step_torch"):
+            return self.model.step_torch(X, U)
+
+        # if model.step returns numpy, wrap (not recommended for GPU)
+        out = self.model.step(X, U)
+        return torch.as_tensor(out, device=self.device, dtype=self.dtype)
+
+    @torch.no_grad()
+    def compute_action(self, X0):
+        """
+        X0: (12,) numpy or torch
+        Returns:
+          U0 (6,) numpy, X1_pred (12,) numpy, U_seq (H,6) numpy
+        """
+        X0 = torch.as_tensor(np.array(X0, float).reshape(12,), device=self.device, dtype=self.dtype)
+
+        # noise (K,H,6)
+        eps = torch.randn((self.K, self.H, 6), generator=self.gen, device=self.device, dtype=self.dtype) * self.noise_sigma
+        Usamp = self.U_nom.unsqueeze(0) + eps
+        Usamp = self.clamp_vec(Usamp, self.U_min.view(1,1,6), self.U_max.view(1,1,6))
+
+        # rollout init
+        X = X0.view(1, 12).repeat(self.K, 1)   # (K,12)
+        costs = torch.zeros((self.K,), device=self.device, dtype=self.dtype)
+        U_prev = None
+
+        g1 = self.goal1.view(1,3)
+        g2 = self.goal2.view(1,3)
+
+        for t in range(self.H):
+            U = Usamp[:, t, :]  # (K,6)
+
+            p1 = X[:, 0:3];  v1 = X[:, 3:6]
+            p2 = X[:, 6:9];  v2 = X[:, 9:12]
+
+            # goal tracking (sum both)
+            dp1 = p1 - g1
+            dp2 = p2 - g2
+            costs = costs + self.w_goal * (dp1*dp1).sum(dim=-1)
+            costs = costs + self.w_goal * (dp2*dp2).sum(dim=-1)
+
+            # control effort
+            costs = costs + self.w_u * (U*U).sum(dim=-1)
+
+            # smoothness
+            if U_prev is not None:
+                dU = U - U_prev
+                costs = costs + self.w_smooth * (dU*dU).sum(dim=-1)
+            U_prev = U
+
+            # obstacle cost for both positions
+            costs = costs + self._obstacle_cost(p1)
+            costs = costs + self._obstacle_cost(p2)
+
+            # height costs
+            costs = costs + self._height_cost(p1[:,2], terminal=False)
+            costs = costs + self._height_cost(p2[:,2], terminal=False)
+
+            # speed costs
+            costs = costs + self._velocity_cost(v1, terminal=False)
+            costs = costs + self._velocity_cost(v2, terminal=False)
+
+            # separation
+            costs = costs + self._separation_cost(p1, p2)
+
+            # dynamics
+            X = self._step_dynamics(X, U)
+
+        # terminal cost
+        p1 = X[:, 0:3]; p2 = X[:, 6:9]
+        dp1 = p1 - g1; dp2 = p2 - g2
+        costs = costs + self.w_terminal * (dp1*dp1).sum(dim=-1)
+        costs = costs + self.w_terminal * (dp2*dp2).sum(dim=-1)
+
+        costs = costs + self._obstacle_cost(p1) + self._obstacle_cost(p2)
+        costs = costs + self._height_cost(p1[:,2], terminal=True) + self._height_cost(p2[:,2], terminal=True)
+        costs = costs + self._separation_cost(p1, p2)
+
+        # MPPI weights
+        beta = torch.min(costs)
+        w = torch.exp(-(costs - beta) / self.lambda_)
+        w = w / (torch.sum(w) + 1e-12)
+
+        # update nominal
+        self.U_nom = torch.tensordot(w, Usamp, dims=([0],[0]))  # (H,6)
+
+        U0 = self.U_nom[0].clone()
+        U_seq = self.U_nom.clone()
+
+        # shift
+        self.U_nom = torch.roll(self.U_nom, shifts=-1, dims=0)
+        self.U_nom[-1] = 0.5 * self.U_nom[-2]
+
+        # predict 1-step
+        X1 = self._step_dynamics(X0.view(1,12), U0.view(1,6))[0]
+
+        return U0.cpu().numpy(), X1.cpu().numpy(), U_seq.cpu().numpy()
