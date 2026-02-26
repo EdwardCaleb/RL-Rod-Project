@@ -1,250 +1,250 @@
 import numpy as np
 
-class SingleMPPIPlanner:
-    """
-    MPPI para dron como punto-masa:
-      x = [p(3), v(3)]
-      u = a_cmd(3)  (aceleración deseada)
-    Obstáculos: esferas y cajas AABB (axis-aligned).
-    """
+# class SingleMPPIPlanner:
+#     """
+#     MPPI para dron como punto-masa:
+#       x = [p(3), v(3)]
+#       u = a_cmd(3)  (aceleración deseada)
+#     Obstáculos: esferas y cajas AABB (axis-aligned).
+#     """
 
-    def __init__(
-        self,
-        dt:float = 0.1,
-        horizon: int = 30,           # pasos
-        num_samples: int = 300,      # rollouts
-        lambda_: float = 1.0,            # temperatura MPPI (exploración)
-        noise_sigma: np.ndarray = np.array([2.0, 2.0, 4.0]),  # ruido en Newton step
-        F_min: np.ndarray = np.array([-8.0, -8.0,  0.0]),
-        F_max: np.ndarray = np.array([ 8.0,  8.0,  25.0]),
-        w_goal: float = 6.0,         # goal weighting (tracking)
-        w_terminal: float = 50.0,    # terminal cost weighting
-        w_F: float = 0.05,           # control cost weighting
-        w_smooth: float = 0.02,      # smoothness cost weighting (delta u)
-        w_obs: float = 80.0,         # obstacle cost weighting
-        obs_margin: float = 0.20,    # margen de seguridad para obstáculos
-        obs_softness: float = 0.15,  # suavidad de la penalización de obstáculos
-        goal_tolerance: float = 0.10, # distancia al goal para considerar "llegado"
-        z_min: float = 0.5,         # altura mínima (suelo)
-        z_max: float = 2.0,         # altura máxima (techo)
-        z_margin: float = 0.15,      # “zona amarilla” cerca de límites
-        w_z: float = 200.0,          # peso altura durante rollout
-        w_z_terminal: float = 400.0, # peso terminal altura
-        rng_seed: int = 0,
-    ):
-        self.dt = float(dt)
-        self.H = int(horizon)
-        self.K = int(num_samples)
-        self.lambda_ = float(lambda_)
+#     def __init__(
+#         self,
+#         dt:float = 0.1,
+#         horizon: int = 30,           # pasos
+#         num_samples: int = 300,      # rollouts
+#         lambda_: float = 1.0,            # temperatura MPPI (exploración)
+#         noise_sigma: np.ndarray = np.array([2.0, 2.0, 4.0]),  # ruido en Newton step
+#         F_min: np.ndarray = np.array([-8.0, -8.0,  0.0]),
+#         F_max: np.ndarray = np.array([ 8.0,  8.0,  25.0]),
+#         w_goal: float = 6.0,         # goal weighting (tracking)
+#         w_terminal: float = 50.0,    # terminal cost weighting
+#         w_F: float = 0.05,           # control cost weighting
+#         w_smooth: float = 0.02,      # smoothness cost weighting (delta u)
+#         w_obs: float = 80.0,         # obstacle cost weighting
+#         obs_margin: float = 0.20,    # margen de seguridad para obstáculos
+#         obs_softness: float = 0.15,  # suavidad de la penalización de obstáculos
+#         goal_tolerance: float = 0.10, # distancia al goal para considerar "llegado"
+#         z_min: float = 0.5,         # altura mínima (suelo)
+#         z_max: float = 2.0,         # altura máxima (techo)
+#         z_margin: float = 0.15,      # “zona amarilla” cerca de límites
+#         w_z: float = 200.0,          # peso altura durante rollout
+#         w_z_terminal: float = 400.0, # peso terminal altura
+#         rng_seed: int = 0,
+#     ):
+#         self.dt = float(dt)
+#         self.H = int(horizon)
+#         self.K = int(num_samples)
+#         self.lambda_ = float(lambda_)
 
-        self.noise_sigma = noise_sigma.astype(float)
-        self.F_min = F_min.astype(float)
-        self.F_max = F_max.astype(float)
+#         self.noise_sigma = noise_sigma.astype(float)
+#         self.F_min = F_min.astype(float)
+#         self.F_max = F_max.astype(float)
 
-        self.w_goal = float(w_goal)
-        self.w_terminal = float(w_terminal)
-        self.w_F = float(w_F)
-        self.w_smooth = float(w_smooth)
-        self.w_obs = float(w_obs)
-        self.obs_margin = float(obs_margin)
-        self.obs_softness = float(obs_softness)
-        self.goal_tolerance = float(goal_tolerance)
+#         self.w_goal = float(w_goal)
+#         self.w_terminal = float(w_terminal)
+#         self.w_F = float(w_F)
+#         self.w_smooth = float(w_smooth)
+#         self.w_obs = float(w_obs)
+#         self.obs_margin = float(obs_margin)
+#         self.obs_softness = float(obs_softness)
+#         self.goal_tolerance = float(goal_tolerance)
 
-        self.goal = np.zeros(3, dtype=float)
+#         self.goal = np.zeros(3, dtype=float)
         
-        # altura
-        self.z_min = float(z_min)
-        self.z_max = float(z_max)
-        self.z_margin = float(z_margin)
-        self.w_z = float(w_z)
-        self.w_z_terminal = float(w_z_terminal)
+#         # altura
+#         self.z_min = float(z_min)
+#         self.z_max = float(z_max)
+#         self.z_margin = float(z_margin)
+#         self.w_z = float(w_z)
+#         self.w_z_terminal = float(w_z_terminal)
 
-        # model
-        self.model = None  # <-- por defecto no hay modelo
+#         # model
+#         self.model = None  # <-- por defecto no hay modelo
 
-        # Secuencia nominal de fuerzas (H x 3)
-        self.F_nom = np.zeros((self.H, 3), dtype=float)
+#         # Secuencia nominal de fuerzas (H x 3)
+#         self.F_nom = np.zeros((self.H, 3), dtype=float)
 
-        # Obstáculos: lista de dicts
-        self.obstacles = []
+#         # Obstáculos: lista de dicts
+#         self.obstacles = []
 
-        # RNG
-        self.rng = np.random.default_rng(rng_seed)
+#         # RNG
+#         self.rng = np.random.default_rng(rng_seed)
 
-    def set_goal(self, goal_xyz):
-        self.goal = np.array(goal_xyz, dtype=float)
+#     def set_goal(self, goal_xyz):
+#         self.goal = np.array(goal_xyz, dtype=float)
 
-    def set_obstacles(self, obstacles):
-        """
-        obstacles: lista de dicts, ejemplos:
-          {"type":"sphere", "c":[x,y,z], "r":0.25}
-          {"type":"box", "c":[x,y,z], "h":[hx,hy,hz]}   # AABB half-sizes
-        """
-        self.obstacles = obstacles
+#     def set_obstacles(self, obstacles):
+#         """
+#         obstacles: lista de dicts, ejemplos:
+#           {"type":"sphere", "c":[x,y,z], "r":0.25}
+#           {"type":"box", "c":[x,y,z], "h":[hx,hy,hz]}   # AABB half-sizes
+#         """
+#         self.obstacles = obstacles
 
-    # ---------------------------
-    # Distancias a obstáculos
-    # ---------------------------
-    def _sphere_penalty(self, p, c, r):
-        # distancia al borde (positiva fuera)
-        d = np.linalg.norm(p - c) - (r + self.obs_margin)
-        # penalización suave: grande cerca / dentro
-        # inside => d<0 => exp(-d/s) crece muchísimo
-        return np.exp(-d / self.obs_softness)
+#     # ---------------------------
+#     # Distancias a obstáculos
+#     # ---------------------------
+#     def _sphere_penalty(self, p, c, r):
+#         # distancia al borde (positiva fuera)
+#         d = np.linalg.norm(p - c) - (r + self.obs_margin)
+#         # penalización suave: grande cerca / dentro
+#         # inside => d<0 => exp(-d/s) crece muchísimo
+#         return np.exp(-d / self.obs_softness)
 
-    def _box_penalty(self, p, c, h):
-        # AABB: distancia signed-like (aprox) usando distancia a caja
-        q = np.abs(p - c) - h - self.obs_margin
-        outside = np.maximum(q, 0.0)
-        d_out = np.linalg.norm(outside)  # 0 si está dentro/proyectado
-        # Si está dentro: q tiene componentes negativas
-        inside = np.all(q <= 0.0)
-        if inside:
-            # dentro => penaliza muy fuerte
-            return np.exp(+2.0 / self.obs_softness)
-        else:
-            return np.exp(-d_out / self.obs_softness)
+#     def _box_penalty(self, p, c, h):
+#         # AABB: distancia signed-like (aprox) usando distancia a caja
+#         q = np.abs(p - c) - h - self.obs_margin
+#         outside = np.maximum(q, 0.0)
+#         d_out = np.linalg.norm(outside)  # 0 si está dentro/proyectado
+#         # Si está dentro: q tiene componentes negativas
+#         inside = np.all(q <= 0.0)
+#         if inside:
+#             # dentro => penaliza muy fuerte
+#             return np.exp(+2.0 / self.obs_softness)
+#         else:
+#             return np.exp(-d_out / self.obs_softness)
 
-    def _obstacle_cost(self, p):
-        if not self.obstacles:
-            return 0.0
-        cost = 0.0
-        for obs in self.obstacles:
-            if obs["type"] == "sphere":
-                cost += self._sphere_penalty(p, np.array(obs["c"], float), float(obs["r"]))
-            elif obs["type"] == "box":
-                cost += self._box_penalty(p, np.array(obs["c"], float), np.array(obs["h"], float))
-        return self.w_obs * cost
+#     def _obstacle_cost(self, p):
+#         if not self.obstacles:
+#             return 0.0
+#         cost = 0.0
+#         for obs in self.obstacles:
+#             if obs["type"] == "sphere":
+#                 cost += self._sphere_penalty(p, np.array(obs["c"], float), float(obs["r"]))
+#             elif obs["type"] == "box":
+#                 cost += self._box_penalty(p, np.array(obs["c"], float), np.array(obs["h"], float))
+#         return self.w_obs * cost
     
 
-    # ---------------------------
-    # Costo por rango de altura
-    # ---------------------------
-    def _height_cost(self, z: float, terminal: bool = False) -> float:
-        """
-        Penaliza salir de [z_min, z_max]. Dentro del rango => ~0.
-        En la zona de margen, empieza a subir suave.
-        Fuera del rango, sube fuerte.
-        """
-        # Queremos que (z_min + margin) <= z <= (z_max - margin) sea “seguro”
-        low = (self.z_min + self.z_margin) - z   # >0 si está por debajo de zona segura
-        high = z - (self.z_max - self.z_margin)  # >0 si está por encima de zona segura
+#     # ---------------------------
+#     # Costo por rango de altura
+#     # ---------------------------
+#     def _height_cost(self, z: float, terminal: bool = False) -> float:
+#         """
+#         Penaliza salir de [z_min, z_max]. Dentro del rango => ~0.
+#         En la zona de margen, empieza a subir suave.
+#         Fuera del rango, sube fuerte.
+#         """
+#         # Queremos que (z_min + margin) <= z <= (z_max - margin) sea “seguro”
+#         low = (self.z_min + self.z_margin) - z   # >0 si está por debajo de zona segura
+#         high = z - (self.z_max - self.z_margin)  # >0 si está por encima de zona segura
 
-        # softplus hace transición suave, luego elevamos al cuadrado para empuje fuerte
-        pen = self.softplus(low) ** 2 + self.softplus(high) ** 2
-        w = self.w_z_terminal if terminal else self.w_z
-        return w * float(pen)
+#         # softplus hace transición suave, luego elevamos al cuadrado para empuje fuerte
+#         pen = self.softplus(low) ** 2 + self.softplus(high) ** 2
+#         w = self.w_z_terminal if terminal else self.w_z
+#         return w * float(pen)
     
 
-    # ---------------------------
-    # Dinámica discreta simple
-    # ---------------------------
-    def define_model(self, model):
-        """
-        model debe tener: step(pos, vel, action) -> (new_pos, new_vel, ...)
-        """
-        if not hasattr(model, "step"):
-            raise TypeError("El modelo debe tener un método .step(pos, vel, action)")
-        self.model = model
+#     # ---------------------------
+#     # Dinámica discreta simple
+#     # ---------------------------
+#     def define_model(self, model):
+#         """
+#         model debe tener: step(pos, vel, action) -> (new_pos, new_vel, ...)
+#         """
+#         if not hasattr(model, "step"):
+#             raise TypeError("El modelo debe tener un método .step(pos, vel, action)")
+#         self.model = model
     
-    def _step_dynamics(self, p, v, u):
-        if self.model is None:
-            # fallback a semi-implicit Euler
-            v2 = v + u * self.dt
-            p2 = p + v2 * self.dt
-            return p2, v2
+#     def _step_dynamics(self, p, v, u):
+#         if self.model is None:
+#             # fallback a semi-implicit Euler
+#             v2 = v + u * self.dt
+#             p2 = p + v2 * self.dt
+#             return p2, v2
 
-        out = self.model.step(p, v, u)
-        # soporta (p2, v2) o (p2, v2, pos_var, vel_var, ...)
-        return out[0], out[1]
+#         out = self.model.step(p, v, u)
+#         # soporta (p2, v2) o (p2, v2, pos_var, vel_var, ...)
+#         return out[0], out[1]
 
 
-    # ---------------------------
-    # Funciones auxiliares
-    # ---------------------------
-    def clamp_vec(self, x, lo, hi):
-        return np.minimum(np.maximum(x, lo), hi)
+#     # ---------------------------
+#     # Funciones auxiliares
+#     # ---------------------------
+#     def clamp_vec(self, x, lo, hi):
+#         return np.minimum(np.maximum(x, lo), hi)
     
-    def softplus(self,x):
-        # estable numéricamente
-        return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.0)
+#     def softplus(self,x):
+#         # estable numéricamente
+#         return np.log1p(np.exp(-np.abs(x))) + np.maximum(x, 0.0)
 
-    # ---------------------------
-    # MPPI core
-    # ---------------------------
-    def compute_action(self, p0, v0):
-        p0 = np.array(p0, dtype=float)
-        v0 = np.array(v0, dtype=float)
+#     # ---------------------------
+#     # MPPI core
+#     # ---------------------------
+#     def compute_action(self, p0, v0):
+#         p0 = np.array(p0, dtype=float)
+#         v0 = np.array(v0, dtype=float)
 
-        # Si ya estás cerca del goal, apaga aceleración (suaviza)
-        if np.linalg.norm(p0 - self.goal) < self.goal_tolerance:
-            self.F_nom[:] = 0.0
-            return np.zeros(3), p0, v0
+#         # Si ya estás cerca del goal, apaga aceleración (suaviza)
+#         if np.linalg.norm(p0 - self.goal) < self.goal_tolerance:
+#             self.F_nom[:] = 0.0
+#             return np.zeros(3), p0, v0
 
-        # Muestreo de ruido: (K, H, 3)
-        eps = self.rng.normal(0.0, 1.0, size=(self.K, self.H, 3)) * self.noise_sigma
+#         # Muestreo de ruido: (K, H, 3)
+#         eps = self.rng.normal(0.0, 1.0, size=(self.K, self.H, 3)) * self.noise_sigma
 
-        # Construir controles muestreados F = clamp(F_nom + eps)
-        Fsamp = self.F_nom[None, :, :] + eps
-        Fsamp = self.clamp_vec(Fsamp, self.F_min[None, None, :], self.F_max[None, None, :])
+#         # Construir controles muestreados F = clamp(F_nom + eps)
+#         Fsamp = self.F_nom[None, :, :] + eps
+#         Fsamp = self.clamp_vec(Fsamp, self.F_min[None, None, :], self.F_max[None, None, :])
 
-        costs = np.zeros(self.K, dtype=float) # costo total de cada rollout
+#         costs = np.zeros(self.K, dtype=float) # costo total de cada rollout
 
-        # Rollouts
-        for k in range(self.K):
-            p = p0.copy()
-            v = v0.copy()
-            J = 0.0 # costo total del rollout
-            F_prev = None
-            for t in range(self.H):
-                F = Fsamp[k, t]
+#         # Rollouts
+#         for k in range(self.K):
+#             p = p0.copy()
+#             v = v0.copy()
+#             J = 0.0 # costo total del rollout
+#             F_prev = None
+#             for t in range(self.H):
+#                 F = Fsamp[k, t]
 
-                # costos de tracking + control
-                # (puedes cambiar w_goal si quieres que sea más agresivo)
-                dp = p - self.goal
-                J += self.w_goal * np.dot(dp, dp) # tracking al goal
-                J += self.w_F * np.dot(F, F)    # costo de control (penaliza fuerza grande)
+#                 # costos de tracking + control
+#                 # (puedes cambiar w_goal si quieres que sea más agresivo)
+#                 dp = p - self.goal
+#                 J += self.w_goal * np.dot(dp, dp) # tracking al goal
+#                 J += self.w_F * np.dot(F, F)    # costo de control (penaliza fuerza grande)
 
-                if F_prev is not None:
-                    dF = (F - F_prev)
-                    J += self.w_smooth * np.dot(dF, dF) # penaliza cambios bruscos (smoothness)
-                F_prev = F
+#                 if F_prev is not None:
+#                     dF = (F - F_prev)
+#                     J += self.w_smooth * np.dot(dF, dF) # penaliza cambios bruscos (smoothness)
+#                 F_prev = F
 
-                # obstáculo
-                J += self._obstacle_cost(p) # costo de obstáculos en cada paso
+#                 # obstáculo
+#                 J += self._obstacle_cost(p) # costo de obstáculos en cada paso
 
-                # altura
-                J += self._height_cost(p[2], terminal=False) # costo por altura en cada paso
+#                 # altura
+#                 J += self._height_cost(p[2], terminal=False) # costo por altura en cada paso
 
-                # dinámica
-                p, v = self._step_dynamics(p, v, F) # actualiza estado con la dinámica (modelo)
+#                 # dinámica
+#                 p, v = self._step_dynamics(p, v, F) # actualiza estado con la dinámica (modelo)
 
-            # costo terminal
-            J += self.w_terminal * np.dot(p - self.goal, p - self.goal) # costo terminal (tracking final)
-            J += self._obstacle_cost(p) # costo de obstáculos en estado final
+#             # costo terminal
+#             J += self.w_terminal * np.dot(p - self.goal, p - self.goal) # costo terminal (tracking final)
+#             J += self._obstacle_cost(p) # costo de obstáculos en estado final
 
-            costs[k] = J # costo total del rollout k
+#             costs[k] = J # costo total del rollout k
 
-        # Pesos MPPI
-        beta = np.min(costs) # baseline para estabilidad numérica
-        w = np.exp(-(costs - beta) / self.lambda_) # pesos sin normalizar
-        w_sum = np.sum(w) + 1e-12 # evitar división por cero
-        w = w / w_sum # normalizar pesos
+#         # Pesos MPPI
+#         beta = np.min(costs) # baseline para estabilidad numérica
+#         w = np.exp(-(costs - beta) / self.lambda_) # pesos sin normalizar
+#         w_sum = np.sum(w) + 1e-12 # evitar división por cero
+#         w = w / w_sum # normalizar pesos
 
-        # Actualiza secuencia nominal F_nom con promedio ponderado
-        # F_nom <- sum_k w_k * Fsamp_k
-        self.F_nom = np.tensordot(w, Fsamp, axes=(0, 0)) # nuevo plan nominal (H x 3)
+#         # Actualiza secuencia nominal F_nom con promedio ponderado
+#         # F_nom <- sum_k w_k * Fsamp_k
+#         self.F_nom = np.tensordot(w, Fsamp, axes=(0, 0)) # nuevo plan nominal (H x 3)
 
-        # Acción receding-horizon: primer control
-        F0 = self.F_nom[0].copy()
+#         # Acción receding-horizon: primer control
+#         F0 = self.F_nom[0].copy()
 
-        # Shift del plan (para el próximo step)
-        self.F_nom[:-1] = self.F_nom[1:] # shift left
-        self.F_nom[-1] = self.F_nom[-2] * 0.5  # decaimiento suave
+#         # Shift del plan (para el próximo step)
+#         self.F_nom[:-1] = self.F_nom[1:] # shift left
+#         self.F_nom[-1] = self.F_nom[-2] * 0.5  # decaimiento suave
 
-        # Predicción 1-step (para p_d, v_d)
-        p1, v1 = self._step_dynamics(p0, v0, F0)
-        return F0, p1, v1
+#         # Predicción 1-step (para p_d, v_d)
+#         p1, v1 = self._step_dynamics(p0, v0, F0)
+#         return F0, p1, v1
     
 
 
@@ -496,18 +496,30 @@ class SingleMPPIPlannerTorch:
         self.model = model
 
     def _step_dynamics(self, p, v, F):
-        """
-        p,v,F: (...,3) torch
-        """
+        assert isinstance(p, torch.Tensor) and p.is_cuda
+        assert isinstance(v, torch.Tensor) and v.is_cuda
+        assert isinstance(F, torch.Tensor) and F.is_cuda
+
         if self.model is None:
-            # fallback a semi-implicit Euler (sin g ni masa)
             v2 = v + F * self.dt
             p2 = p + v2 * self.dt
             return p2, v2
 
+        if hasattr(self.model, "step_torch"):
+            p2, v2 = self.model.step_torch(p, v, F)
+            # asserts post
+            assert isinstance(p2, torch.Tensor) and p2.is_cuda
+            assert isinstance(v2, torch.Tensor) and v2.is_cuda
+            return p2, v2
+
+        # fallback numpy model (NO recomendado para GPU)
         out = self.model.step(p, v, F)
-        # soporta (p2, v2) o (p2, v2, ...)
-        return out[0], out[1]
+        p2, v2 = out[0], out[1]
+        if not isinstance(p2, torch.Tensor):
+            p2 = torch.as_tensor(p2, device=self.device, dtype=self.dtype)
+        if not isinstance(v2, torch.Tensor):
+            v2 = torch.as_tensor(v2, device=self.device, dtype=self.dtype)
+        return p2, v2
 
     # ---------------------------
     # Funciones auxiliares

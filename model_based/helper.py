@@ -83,3 +83,37 @@ def enforce_tilt_and_thrust_limits(F, u1_max, tilt_max_rad):
         F2 *= (u1_max / nF)
 
     return F2
+
+
+
+
+
+def get_drone_state(model, data, drone_id):
+    r = data.xpos[drone_id].copy()
+    q = data.xquat[drone_id].copy()
+    R = quat_to_rotmat(q)
+
+    # cvel = [wx, wy, wz, vx, vy, vz] (world-aligned)
+    cvel = data.cvel[drone_id].copy()
+    omega_world = cvel[0:3]
+    v_world = cvel[3:6]
+
+    omega_body = R.T @ omega_world
+    return r, v_world, R, omega_body
+
+
+def reset_episode(model, data):
+    mujoco.mj_resetData(model, data)     # vuelve a qpos0, qvel=0, etc.
+    # opcional: randomizar qpos/qvel aquí
+    mujoco.mj_forward(model, data)
+    # reset actions a 0 (importante para evitar spikes de acción en el primer paso)
+    data.ctrl[:] = 0.0
+
+
+def set_goal_for_episode(p0, ep_idx):
+    # ejemplo: goals distintos por episodio
+    # (cámbialo a random si quieres)
+    offset = np.array([2.5, 0.0, 1.0])
+    if ep_idx % 2 == 1:
+        offset = np.array([2.5, 0.8, 1.0])
+    return p0 + offset
