@@ -907,7 +907,7 @@ class OnlineSVGPBatch:
 
             self._optimizer.zero_grad(set_to_none=True)
             out = self.model(xb)
-            loss = -self.mll(out, yb)
+            loss = -self.mll(out, yb).sum()
             loss.backward()
             self._optimizer.step()
 

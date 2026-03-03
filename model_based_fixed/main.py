@@ -18,7 +18,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"  # UNSAFE workaround, only used for 
 # --------- 1) CONFIGURACIÓN MUJOCO --------------------------
 # ============================================================
 # XML_PATH = "system/single_quad_obs_u1234.xml"
-XML_PATH = "D:\\Lehigh\\1st Semester\\Indepedent Study\\Code\\RL-Rod-Project\\model_based\\system\\single_quad_obs_u1234.xml"
+XML_PATH = "D:\\Lehigh\\1st Semester\\Indepedent Study\\Code\\RL-Rod-Project\\model_based_fixed\\system\\single_quad_obs_u1234.xml"
 # Episodios
 NUM_EPISODES = 10 # Episodios
 STEPS_PER_EP = 1500
@@ -27,7 +27,7 @@ STEPS_PER_EP = 1500
 RENDER = True
 
 # Paths persistencia
-LOG_DIR = "D:\\Lehigh\\1st Semester\\Indepedent Study\\Code\\RL-Rod-Project\\model_based\\logs"
+LOG_DIR = "D:\\Lehigh\\1st Semester\\Indepedent Study\\Code\\RL-Rod-Project\\model_based_fixed\\logs"
 MODEL_PATH = os.path.join(LOG_DIR, "svgp_dyn.pt")
 ROLLOUTS_PATH = os.path.join(LOG_DIR, "rollouts_all.npz")
 EP_ROLLOUTS_FMT = os.path.join(LOG_DIR, "rollouts_ep{:03d}.npz")
@@ -47,7 +47,7 @@ RESET_GP_EACH_EP = False
 SAVE_EACH_EP = False
 
 # Guardar y entrenar modelo final al terminar todos los episodios
-SAVE_FINAL = False
+SAVE_FINAL = True
 
 # Dybamics model para MPPI: puedes usar punto-masa o el GP cuando ya esté entrenado
 DYN_MODEL_TYPE = "GP"  # opciones: "MASS" o "GP"
@@ -144,7 +144,7 @@ def main():
 
     planner = SingleMPPIPlannerTorch(
         dt=dt,
-        horizon=40,            # pasos
+        horizon=80,            # pasos
         num_samples=1024//2,       # rollouts
         lambda_=10.0,            # temperatura
         noise_sigma=np.array([2.0*m, 2.0*m, 4.0*m]),  # ruido en newton step
@@ -322,8 +322,8 @@ def main():
             # print size of collected data
             print(f"total collected transitions: {len(dyn_gp.Z_buf)}")
             dyn_gp.train_full()
-            dyn_gp.save_model("logs/svgp_dyn.pt")
-            dyn_gp.save_rollouts("logs/rollouts_all.npz")
+            dyn_gp.save_model(os.path.join(LOG_DIR, "svgp_dyn.pt"))
+            dyn_gp.save_rollouts(os.path.join(LOG_DIR, "rollouts_all.npz"))
 
     if RENDER:
         with viewer.launch_passive(model, data) as vis:
