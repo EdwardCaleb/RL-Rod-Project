@@ -113,7 +113,7 @@ def reset_episode(model, data):
 def set_goal_for_episode(p0, ep_idx):
     # ejemplo: goals distintos por episodio
     # (cámbialo a random si quieres)
-    offset = np.array([2.5, 0.0, 1.0])
+    offset = np.array([2.5, 0.0, 0.0])
     if ep_idx % 2 == 1:
-        offset = np.array([2.5, 0.8, 1.0])
+        offset = np.array([2.5, 0.8, 0.0])
     return p0 + offset
