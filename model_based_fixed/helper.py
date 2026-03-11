@@ -110,10 +110,15 @@ def reset_episode(model, data):
     data.ctrl[:] = 0.0
 
 
-def set_goal_for_episode(p0, ep_idx):
+def set_goal_for_episode(p0, height, ep_idx):
     # ejemplo: goals distintos por episodio
     # (cámbialo a random si quieres)
-    offset = np.array([2.5, 0.0, 0.0])
+    #altura fija, pero varía en x/y cada episodio
+    offset = np.array([2.5, -0.4, 0.0])
     if ep_idx % 2 == 1:
-        offset = np.array([2.5, 0.8, 0.0])
-    return p0 + offset
+        offset = np.array([2.5, 0.4, 0.0])
+    goal = p0 + offset
+
+    goal[2] = height
+    # goal =np.array([2.5, 0.0, height])
+    return goal
