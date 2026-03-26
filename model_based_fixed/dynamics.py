@@ -996,4 +996,3 @@ if __name__ == "__main__":
     #verificar que cuda se está usando
     print("Device used:", model.device)
 
-

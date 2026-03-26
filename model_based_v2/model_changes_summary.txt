@@ -1,0 +1,7 @@
+Modified files:
+- model_based_fixed/SVGP.py
+  Added OnlineSVGPBatchAxiswise1D (batched independent 1D SVGP manager for ax=g(Fx), ay=g(Fy), az=g(Fz)).
+- model_based_fixed/dynamics.py
+  Added _BaseSVGPDroneAxisAccelDynamicModel
+  Added SVGPDroneAccelerationDynamicModel
+  Added SVGPDroneResidualAccelerationDynamicModel
