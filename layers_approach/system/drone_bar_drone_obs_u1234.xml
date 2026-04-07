@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="two_drones_flexible_bar_balljoints">
+
+  <compiler angle="radian"/>
+
+  <option timestep="0.001"
+          gravity="0 0 -9.81"
+          integrator="implicitfast"
+          solver="Newton"
+          iterations="50"
+          tolerance="1e-9"/>
+
+  <default>
+    <joint damping="0.15" limited="false"/>
+    <geom contype="0" conaffinity="0" rgba="0.6 0.4 0.2 1"/>
+    <site size="0.01" rgba="1 1 0 0.5"/>
+
+    <default class="spring_hinge">
+      <!-- Para barra horizontal (alineada con eje X):
+           flexión en plano XZ  -> eje Y
+           flexión en plano XY  -> eje Z -->
+      <joint type="hinge" stiffness="4" damping="0.15" limited="false" armature="0.0001"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient"
+             rgb1="0.85 0.92 1.0" rgb2="0.18 0.28 0.55"
+             width="512" height="512"/>
+    <texture name="tex_floor" type="2d" builtin="checker"
+             rgb1="0.72 0.72 0.72" rgb2="0.88 0.88 0.88"
+             width="512" height="512"/>
+
+    <material name="mat_floor"   texture="tex_floor" texrepeat="8 8" reflectance="0.50" shininess="0.4"/>
+    <material name="mat_segment" rgba="0.65 0.42 0.18 1" shininess="0.4"/>
+    <material name="mat_joint"   rgba="0.92 0.92 0.92 1" shininess="0.7"/>
+    <material name="mat_socket"  rgba="0.95 0.75 0.10 1" shininess="1.0"/>
+    <material name="MatDroneA"   rgba="0.18 0.18 0.18 1" shininess="0.9"/>
+    <material name="MatDroneB"   rgba="0.60 0.10 0.10 1" shininess="0.9"/>
+  </asset>
+
+  <worldbody>
+    <light name="ambient_light" directional="false"
+           pos="0 0 5" dir="0 0 -1"
+           diffuse="0.6 0.6 0.6" specular="0.2 0.2 0.2" castshadow="false"/>
+    <light name="sun" directional="true"
+           pos="2 2 4" dir="-0.5 -0.5 -1"
+           diffuse="0.9 0.9 0.85" specular="0.4 0.4 0.4" castshadow="true"/>
+
+    <geom name="floor" type="plane" size="6 6 0.1" material="mat_floor" contype="1" conaffinity="2"/>
+
+    <!-- Máscara de colisión:
+         - piso:    contype=1, conaffinity=2
+         - sólidos: contype=2, conaffinity=1
+         Así, drones y barra colisionan con el piso, pero no entre sí. -->
+
+    <!--
+      Geometría inicial:
+      - Ambos drones arrancan apoyados sobre el piso.
+      - La barra flexible arranca horizontal y tocando el piso.
+      - Longitud total barra = 5 * 0.30 = 1.50 m.
+      - Puntos de unión:
+          drone_A attach = (-0.75, 0, 0.05)
+          drone_B attach = ( 0.75, 0, 0.05)
+    -->
+
+    <!-- BARRA FLEXIBLE -->
+    <body name="seg1" pos="-0.60 0 0.012">
+      <joint name="seg1_free" type="free"/>
+
+      <geom name="g_seg1" type="cylinder" size="0.012 0.15"
+            euler="0 1.57079632679 0"
+            material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
+      <geom name="g_j0" type="sphere" size="0.018" pos="-0.15 0 0"
+            material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+      <geom name="g_j1" type="sphere" size="0.018" pos=" 0.15 0 0"
+            material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+      <site name="site_bar_A" pos="-0.15 0 0" size="0.01" rgba="1 1 0 1"/>
+
+      <body name="seg2" pos="0.30 0 0">
+        <joint name="j12_ry" class="spring_hinge" axis="0 1 0"/>
+        <joint name="j12_rz" class="spring_hinge" axis="0 0 1"/>
+        <geom name="g_seg2" type="cylinder" size="0.012 0.15"
+              euler="0 1.57079632679 0"
+              material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
+        <geom name="g_j2" type="sphere" size="0.018" pos="0.15 0 0"
+              material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+        <body name="seg3" pos="0.30 0 0">
+          <joint name="j23_ry" class="spring_hinge" axis="0 1 0"/>
+          <joint name="j23_rz" class="spring_hinge" axis="0 0 1"/>
+          <geom name="g_seg3" type="cylinder" size="0.012 0.15"
+                euler="0 1.57079632679 0"
+                material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
+          <geom name="g_j3" type="sphere" size="0.018" pos="0.15 0 0"
+                material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+          <body name="seg4" pos="0.30 0 0">
+            <joint name="j34_ry" class="spring_hinge" axis="0 1 0"/>
+            <joint name="j34_rz" class="spring_hinge" axis="0 0 1"/>
+            <geom name="g_seg4" type="cylinder" size="0.012 0.15"
+                  euler="0 1.57079632679 0"
+                  material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
+            <geom name="g_j4" type="sphere" size="0.018" pos="0.15 0 0"
+                  material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+            <body name="seg5" pos="0.30 0 0">
+              <joint name="j45_ry" class="spring_hinge" axis="0 1 0"/>
+              <joint name="j45_rz" class="spring_hinge" axis="0 0 1"/>
+              <geom name="g_seg5" type="cylinder" size="0.012 0.15"
+                    euler="0 1.57079632679 0"
+                    material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
+
+              <geom name="g_socket_B" type="sphere" size="0.022" pos="0.15 0 0"
+                    material="mat_socket" contype="0" conaffinity="0" mass="0"/>
+
+              <site name="site_bar_B" pos="0.15 0 0" size="0.01" rgba="1 1 0 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- DRONE A: izquierda -->
+    <body name="drone_A" pos="-0.79 0 0.02">
+      <joint name="drone_A_free" type="free"/>
+
+      <geom name="drone_A_body" type="box" size="0.04 0.04 0.02"
+            material="MatDroneA" mass="0.30" contype="2" conaffinity="1"/>
+      <geom name="g_socket_A" type="sphere" size="0.022" pos="0.04 0 -0.008"
+            material="mat_socket" contype="0" conaffinity="0" mass="0"/>
+
+      <site name="com_site_A" pos="0 0 0" size="0.005" rgba="1 0.5 0 1"/>
+      <site name="site_drone_A_joint" pos="0.04 0 -0.008" size="0.01" rgba="0 1 1 1"/>
+
+      <geom name="arm_A_xp" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01"
+            rgba="0.8 0.8 0.8 1" mass="0.02" contype="2" conaffinity="1"/>
+      <geom name="arm_A_xn" type="box" pos="-0.10 0 0" size="0.06 0.01 0.01"
+            rgba="0.8 0.8 0.8 1" mass="0.02" contype="2" conaffinity="1"/>
+      <geom name="arm_A_yp" type="box" pos="0  0.10 0" size="0.01 0.06 0.01"
+            rgba="0.8 0.8 0.8 1" mass="0.02" contype="2" conaffinity="1"/>
+      <geom name="arm_A_yn" type="box" pos="0 -0.10 0" size="0.01 0.06 0.01"
+            rgba="0.8 0.8 0.8 1" mass="0.02" contype="2" conaffinity="1"/>
+    </body>
+
+    <!-- DRONE B: derecha -->
+    <body name="drone_B" pos="0.79 0 0.02">
+      <joint name="drone_B_free" type="free"/>
+
+      <geom name="drone_B_body" type="box" size="0.04 0.04 0.02"
+            material="MatDroneB" mass="0.30" contype="2" conaffinity="1"/>
+      <geom name="g_socket_B2" type="sphere" size="0.022" pos="-0.04 0 -0.008"
+            material="mat_socket" contype="0" conaffinity="0" mass="0"/>
+
+      <site name="com_site_B" pos="0 0 0" size="0.005" rgba="0 0.5 1 1"/>
+      <site name="site_drone_B_joint" pos="-0.04 0 -0.008" size="0.01" rgba="0 1 1 1"/>
+
+      <geom name="arm_B_xp" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01"
+            rgba="0.9 0.5 0.5 1" mass="0.02" contype="2" conaffinity="1"/>
+      <geom name="arm_B_xn" type="box" pos="-0.10 0 0" size="0.06 0.01 0.01"
+            rgba="0.9 0.5 0.5 1" mass="0.02" contype="2" conaffinity="1"/>
+      <geom name="arm_B_yp" type="box" pos="0  0.10 0" size="0.01 0.06 0.01"
+            rgba="0.9 0.5 0.5 1" mass="0.02" contype="2" conaffinity="1"/>
+      <geom name="arm_B_yn" type="box" pos="0 -0.10 0" size="0.01 0.06 0.01"
+            rgba="0.9 0.5 0.5 1" mass="0.02" contype="2" conaffinity="1"/>
+    </body>
+
+
+        <!-- ARROW/MARKER DRONE 1 -->
+    <!-- Flecha mocap roja: F_des -->
+    <body name="force_arrow_1" mocap="true" pos="0 0 0">
+      <geom name="force_geom_1" type="capsule" size="0.01 0.10"
+            rgba="1 0 0 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+    <!-- Flecha mocap azul: F estimado -->
+    <body name="force_arrow_2" mocap="true" pos="0 0 0">
+      <geom name="force_geom_2" type="capsule" size="0.01 0.10"
+            rgba="0 0 1 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+    <!-- Esfera mocap -->
+    <body name="point_marker_1" mocap="true" pos="0 0 0">
+      <geom name="point_geom_1" type="sphere" size="0.02"
+            rgba="1 0 0 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+    <!-- ARROW/MARKER DRONE 2 -->
+    <!-- Flecha mocap roja: F_des -->
+    <body name="force_arrow_3" mocap="true" pos="0 0 0">
+      <geom name="force_geom_3" type="capsule" size="0.01 0.10"
+            rgba="1 0 0 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+    <!-- Flecha mocap azul: F estimado -->
+    <body name="force_arrow_4" mocap="true" pos="0 0 0">
+      <geom name="force_geom_4" type="capsule" size="0.01 0.10"
+            rgba="0 0 1 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+    <!-- Esfera mocap -->
+    <body name="point_marker_2" mocap="true" pos="0 0 0">
+      <geom name="point_geom_2" type="sphere" size="0.02"
+            rgba="1 0.5 0 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+  </worldbody>
+
+  <!-- RÓTULAS: connect usando sites -->
+  <equality>
+    <connect name="ball_A"
+             site1="site_drone_A_joint"
+             site2="site_bar_A"
+             solimp="0.9 0.99 0.001"
+             solref="0.01 1"/>
+
+    <connect name="ball_B"
+             site1="site_drone_B_joint"
+             site2="site_bar_B"
+             solimp="0.9 0.99 0.001"
+             solref="0.01 1"/>
+  </equality>
+
+  <actuator>
+    <!-- Drone A -->
+    <general name="uA1_thrust" site="com_site_A" ctrllimited="true" ctrlrange="0 10"     gear="0 0 1  0 0 0"/>
+    <general name="uA2_tau_x"  site="com_site_A" ctrllimited="true" ctrlrange="-1 1"     gear="0 0 0  1 0 0"/>
+    <general name="uA3_tau_y"  site="com_site_A" ctrllimited="true" ctrlrange="-1 1"     gear="0 0 0  0 1 0"/>
+    <general name="uA4_tau_z"  site="com_site_A" ctrllimited="true" ctrlrange="-0.2 0.2" gear="0 0 0  0 0 1"/>
+
+    <!-- Drone B -->
+    <general name="uB1_thrust" site="com_site_B" ctrllimited="true" ctrlrange="0 10"     gear="0 0 1  0 0 0"/>
+    <general name="uB2_tau_x"  site="com_site_B" ctrllimited="true" ctrlrange="-1 1"     gear="0 0 0  1 0 0"/>
+    <general name="uB3_tau_y"  site="com_site_B" ctrllimited="true" ctrlrange="-1 1"     gear="0 0 0  0 1 0"/>
+    <general name="uB4_tau_z"  site="com_site_B" ctrllimited="true" ctrlrange="-0.2 0.2" gear="0 0 0  0 0 1"/>
+  </actuator>
+
+  <sensor>
+    <framepos    name="pos_A"    objtype="body" objname="drone_A"/>
+    <framequat   name="quat_A"   objtype="body" objname="drone_A"/>
+    <framelinvel name="linvel_A" objtype="body" objname="drone_A"/>
+    <frameangvel name="rotvel_A" objtype="body" objname="drone_A"/>
+
+    <framepos    name="pos_B"    objtype="body" objname="drone_B"/>
+    <framequat   name="quat_B"   objtype="body" objname="drone_B"/>
+    <framelinvel name="linvel_B" objtype="body" objname="drone_B"/>
+    <frameangvel name="rotvel_B" objtype="body" objname="drone_B"/>
+
+    <jointpos name="s_j12_ry" joint="j12_ry"/>
+    <jointpos name="s_j12_rz" joint="j12_rz"/>
+    <jointpos name="s_j23_ry" joint="j23_ry"/>
+    <jointpos name="s_j23_rz" joint="j23_rz"/>
+    <jointpos name="s_j34_ry" joint="j34_ry"/>
+    <jointpos name="s_j34_rz" joint="j34_rz"/>
+    <jointpos name="s_j45_ry" joint="j45_ry"/>
+    <jointpos name="s_j45_rz" joint="j45_rz"/>
+  </sensor>
+
+</mujoco>

@@ -33,16 +33,17 @@ class MellinguerController:
 
 
     # PIPELINE FUNCTIONS
-    def position_control(self, r_T, v_T, a_T, r, v):
+    def position_control(self, r_T, v_T, a_T, r, v, f_ext=np.zeros(3)):
         # Control law for position
         e_p = r - r_T
         e_v = v - v_T
         zW = np.array([0.0, 0.0, 1.0])
         F_des = (
-            - self._apply_gain(self.Kp, e_p)
-            - self._apply_gain(self.Kv, e_v)
-            + self.mass * self.gravity * zW
-            + self.mass * a_T
+            - self._apply_gain(self.Kp, e_p) # proporcional a error de posición
+            - self._apply_gain(self.Kv, e_v) # proporcional a error de velocidad (damping)
+            + self.mass * self.gravity * zW  # compensación de peso
+            - f_ext*1.0                      # compensación de fuerza externa estimada
+            + self.mass * a_T               # feedforward de aceleración deseada (importante para trayectorias dinámicas, aunque no es parte del paper original de Mellinguer)
         )
 
         if np.linalg.norm(F_des) < 1e-9: # seguridad numérica, evitar fuerza nula que puede causar problemas en orientación deseada
@@ -171,8 +172,8 @@ class MellinguerController:
         F_estimated = self.mass * a - F_des + self.mass * self.gravity * np.array([0.0, 0.0, 1.0])  # simplificación: asumiendo que sin perturbaciones el drone estaría en hover con F_des = peso
         return F_estimated
 
-    def step(self, r_T, v_T, a_T, r, v, a, R_current, omega_current, psi_T, omega_des=None):
-        F_des = self.position_control(r_T, v_T, a_T, r, v)
+    def step(self, r_T, v_T, a_T, r, v, a, R_current, omega_current, psi_T, omega_des=None, f_ext=np.zeros(3)):
+        F_des = self.position_control(r_T, v_T, a_T, r, v, f_ext=f_ext)  # aquí podrías pasar una estimación de fuerza externa si la tienes
         F_estimated = self.exerted_force_estimation(F_des, a=a)
         u1 = self.total_thrust(F_des, R_current)
         R_des = self.desired_orientation(F_des, psi_T, R_current)

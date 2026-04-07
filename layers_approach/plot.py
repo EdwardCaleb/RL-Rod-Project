@@ -16,6 +16,21 @@ def plot_trajectory(x, y, xlabel='', ylabel='', title='', xlim=None, ylim=None):
     plt.legend()
     plt.show()
 
+def plot_traj_and_ref(x, y, ref_x, ref_y, xlabel='', ylabel='', title='', xlim=None, ylim=None):
+    plt.figure()
+    plt.plot(x, y, label='Trayectoria del dron')
+    plt.plot(ref_x, ref_y, label='Referencia')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+
+    #ajustar límites y agregar referencia deseada
+    if xlim is not None: plt.xlim(xlim)
+    if ylim is not None: plt.ylim(ylim)
+
+    plt.legend()
+    plt.show()
+
 
 # # visualización de trayectoria (opcional)
 # import matplotlib.pyplot as plt

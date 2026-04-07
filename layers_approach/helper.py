@@ -60,6 +60,44 @@ class ForceArrow:
 
 
 
+class PointMarker:
+    def __init__(self, model, data, marker_idx):
+        self.model = model
+        self.data = data
+        self.marker_idx = marker_idx
+
+        self.body_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_BODY, f"point_marker_{marker_idx}"
+        )
+        if self.body_id < 0:
+            raise ValueError(f"No existe el body 'point_marker_{marker_idx}' en el XML.")
+
+        self.mocap_id = self.model.body_mocapid[self.body_id]
+        if self.mocap_id < 0:
+            raise ValueError(f"'point_marker_{marker_idx}' no es mocap.")
+
+        self.geom_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, f"point_geom_{marker_idx}"
+        )
+        if self.geom_id < 0:
+            raise ValueError(f"No existe el geom 'point_geom_{marker_idx}' en el XML.")
+
+
+    # Función para actualizar el marker en Mujoco
+    def update_point(self, p_world, radius=0.02):
+        """
+        Mueve el marcador al punto p_world.
+        - radius: tamaño del punto (radio de la esfera)
+        """
+        p = np.asarray(p_world, dtype=float)
+
+        # Posición directa (no hay offset como en la flecha)
+        self.data.mocap_pos[self.mocap_id] = p
+
+        # Tamaño de la esfera (solo 1 valor: radio)
+        self.model.geom_size[self.geom_id][0] = float(radius)
+
+
 
 
 def enforce_tilt_and_thrust_limits(F, u1_max, tilt_max_rad):

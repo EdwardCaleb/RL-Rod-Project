@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="elastic_rod_drone_v5">
+
+  <!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║           PARÁMETROS AJUSTABLES – editar solo esta sección          ║
+  ╠══════════════════════════════════════════════════════════════════════╣
+  ║                                                                      ║
+  ║  MASA DE LA BARRA                                                    ║
+  ║  ─────────────────────────────────────────────────────────────────  ║
+  ║  Cada segmento tiene dos geoms:                                      ║
+  ║    • cilindro  →  atributo mass en g_seg1…g_seg5                    ║
+  ║    • esfera de junta → atributo mass en g_j1…g_j4                   ║
+  ║                                                                      ║
+  ║  Valores por defecto (originales):                                   ║
+  ║    SEG_MASS  = 0.060 kg   (cilindro de 0.30 m)                      ║
+  ║    JOINT_MASS= 0.008 kg   (esfera decorativa)                       ║
+  ║    → masa total barra ≈ 5×0.060 + 4×0.008 = 0.332 kg               ║
+  ║                                                                      ║
+  ║  Valores recomendados para que el dron pueda manipular la barra:    ║
+  ║    SEG_MASS  = 0.00112 kg  ← reducir aquí                             ║
+  ║    JOINT_MASS= 0.002 kg  ← reducir aquí                             ║
+  ║    → masa total barra ≈ 5×0.00112 + 4×0.002 = 0.016 kg               ║
+  ║                                                                      ║
+  ║  Referencia: dron pesa ~0.42 kg, thrust_max = 10 N                  ║
+  ║  Para hover de barra+dron se necesita ≥ (m_barra+0.42)×9.81 N      ║
+  ║    con m_barra=0.332 → necesita 7.4 N  (posible pero sin margen)   ║
+  ║    con m_barra=0.083 → necesita 4.9 N  (margen cómodo ~50%)        ║
+  ║                                                                      ║
+  ║  RIGIDEZ TORSIONAL DE LA BARRA                                       ║
+  ║  ─────────────────────────────────────────────────────────────────  ║
+  ║  Controla cuánto se dobla la barra bajo carga lateral.              ║
+  ║  Buscar: stiffness="XX" en los joints class="spring_hinge"          ║
+  ║  (y en root_rx / root_ry)                                            ║
+  ║                                                                      ║
+  ║  Valor actual : 50  Nm/rad  (~barra rígida de aluminio delgado)     ║
+  ║  Rango útil   :                                                      ║
+  ║     1 –  5  Nm/rad  → muy flexible, se dobla con el propio peso     ║
+  ║     5 – 20  Nm/rad  → flexible, responde bien a empuje lateral      ║
+  ║    20 – 50  Nm/rad  → semi-rígida, deflexión pequeña bajo carga     ║
+  ║    > 50     Nm/rad  → casi rígida (puede causar inestabilidad       ║
+  ║                        numérica si se supera ~150 con Δt=0.001)     ║
+  ║                                                                      ║
+  ║  AMORTIGUAMIENTO TORSIONAL                                           ║
+  ║  ─────────────────────────────────────────────────────────────────  ║
+  ║  Buscar: damping="XX" en los mismos joints spring_hinge             ║
+  ║  Valor actual: 0.15 Ns/rad                                          ║
+  ║  Rango útil  : 0.05 – 0.5  (subir si hay oscilaciones, bajar        ║
+  ║                              si la barra responde demasiado lento)  ║
+  ║                                                                      ║
+  ║  THRUST MÁXIMO DEL DRON                                              ║
+  ║  ─────────────────────────────────────────────────────────────────  ║
+  ║  Buscar: ctrlrange="0 10" en el actuador u1_thrust                  ║
+  ║  Subir el límite superior si se quiere más fuerza disponible.       ║
+  ║                                                                      ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+
+  VALORES ACTUALES  (cambiar aquí y buscar la etiqueta correspondiente):
+    SEG_MASS   = 0.00112   ← masa de cada cilindro de segmento  [kg]
+    JOINT_MASS = 0.002   ← masa de cada esfera de junta       [kg]
+    STIFFNESS  = 10      ← rigidez torsional de cada junta    [Nm/rad]
+    DAMPING    = 0.15    ← amortiguamiento torsional          [Ns/rad]
+    THRUST_MAX = 10      ← empuje máximo del dron             [N]
+  -->
+
+  <compiler angle="radian"/>
+
+  <option timestep="0.001"
+          gravity="0 0 -9.81"
+          integrator="implicitfast"
+          solver="Newton"
+          iterations="50"
+          tolerance="1e-10"/>
+
+  <default>
+    <joint damping="0.15" limited="false"/>
+    <geom  contype="1" conaffinity="1" rgba="0.6 0.4 0.2 1"/>
+    <!-- ↓ STIFFNESS y DAMPING de los resortes torsionales de la barra ↓ -->
+    <default class="spring_hinge">
+      <joint type="hinge" stiffness="4" damping="0.15" limited="false"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient"
+             rgb1="0.85 0.92 1.0" rgb2="0.18 0.28 0.55"
+             width="512" height="512"/>
+    <texture name="tex_floor" type="2d" builtin="checker"
+             rgb1="0.72 0.72 0.72" rgb2="0.88 0.88 0.88"
+             width="512" height="512"/>
+    <material name="mat_floor"   texture="tex_floor" texrepeat="8 8"
+              reflectance="0.50" shininess="0.4"/>
+    <material name="mat_segment" rgba="0.65 0.42 0.18 1" shininess="0.4"/>
+    <material name="mat_joint"   rgba="0.92 0.92 0.92 1" shininess="0.7"/>
+    <material name="mat_anchor"  rgba="0.35 0.40 0.95 1" shininess="0.9"/>
+    <material name="MatDrone"    rgba="0.18 0.18 0.18 1" shininess="0.9"/>
+    <material name="mat_socket"  rgba="0.95 0.75 0.10 1" shininess="1.0"/>
+  </asset>
+
+  <worldbody>
+
+    <light name="ambient_light" directional="false"
+           pos="0 0 5" dir="0 0 -1"
+           diffuse="0.6 0.6 0.6" specular="0.2 0.2 0.2" castshadow="false"/>
+    <light name="sun" directional="true"
+           pos="2 2 4" dir="-0.5 -0.5 -1"
+           diffuse="0.9 0.9 0.85" specular="0.4 0.4 0.4" castshadow="true"/>
+
+    <geom name="floor" type="plane" size="6 6 0.1" material="mat_floor"
+          contype="1" conaffinity="1"/>
+
+    <!-- ESFERA ANCLA -->
+    <body name="anchor" pos="0 0 2.0">
+      <geom name="g_anchor" type="sphere" size="0.04" material="mat_anchor"
+            contype="0" conaffinity="0" mass="0.001"/>
+      <joint name="root_rx" class="spring_hinge" axis="1 0 0" pos="0 0 0"/>
+      <joint name="root_ry" class="spring_hinge" axis="0 1 0" pos="0 0 0"/>
+
+      <!-- ── SEG 1 ── -->
+      <!-- ↓ SEG_MASS ↓ -->
+      <body name="seg1" pos="0 0 -0.15">
+        <geom name="g_seg1" type="cylinder" size="0.012 0.15"
+              material="mat_segment" mass="0.00112"/>
+        <!-- ↓ JOINT_MASS ↓ -->
+        <geom name="g_j1" type="sphere" size="0.018" pos="0 0 -0.15"
+              material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+        <!-- ── SEG 2 ── -->
+        <body name="seg2" pos="0 0 -0.30">
+          <joint name="j12_rx" class="spring_hinge" axis="1 0 0"/>
+          <joint name="j12_ry" class="spring_hinge" axis="0 1 0"/>
+          <!-- ↓ SEG_MASS ↓ -->
+          <geom name="g_seg2" type="cylinder" size="0.012 0.15"
+                material="mat_segment" mass="0.00112" pos="0 0 -0.15"/>
+          <!-- ↓ JOINT_MASS ↓ -->
+          <geom name="g_j2" type="sphere" size="0.018" pos="0 0 -0.30"
+                material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+          <!-- ── SEG 3 ── -->
+          <body name="seg3" pos="0 0 -0.30">
+            <joint name="j23_rx" class="spring_hinge" axis="1 0 0"/>
+            <joint name="j23_ry" class="spring_hinge" axis="0 1 0"/>
+            <!-- ↓ SEG_MASS ↓ -->
+            <geom name="g_seg3" type="cylinder" size="0.012 0.15"
+                  material="mat_segment" mass="0.00112" pos="0 0 -0.15"/>
+            <!-- ↓ JOINT_MASS ↓ -->
+            <geom name="g_j3" type="sphere" size="0.018" pos="0 0 -0.30"
+                  material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+            <!-- ── SEG 4 ── -->
+            <body name="seg4" pos="0 0 -0.30">
+              <joint name="j34_rx" class="spring_hinge" axis="1 0 0"/>
+              <joint name="j34_ry" class="spring_hinge" axis="0 1 0"/>
+              <!-- ↓ SEG_MASS ↓ -->
+              <geom name="g_seg4" type="cylinder" size="0.012 0.15"
+                    material="mat_segment" mass="0.00112" pos="0 0 -0.15"/>
+              <!-- ↓ JOINT_MASS ↓ -->
+              <geom name="g_j4" type="sphere" size="0.018" pos="0 0 -0.30"
+                    material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+
+              <!-- ── SEG 5 ── -->
+              <body name="seg5" pos="0 0 -0.30">
+                <joint name="j45_rx" class="spring_hinge" axis="1 0 0"/>
+                <joint name="j45_ry" class="spring_hinge" axis="0 1 0"/>
+                <!-- ↓ SEG_MASS ↓ -->
+                <geom name="g_seg5" type="cylinder" size="0.012 0.15"
+                      material="mat_segment" mass="0.00112" pos="0 0 -0.15"/>
+
+                <!-- Esfera decorativa de la rótula -->
+                <geom name="g_socket" type="sphere" size="0.022"
+                      pos="0 0 -0.30" material="mat_socket"
+                      contype="0" conaffinity="0" mass="0"/>
+
+                <!-- DRON – ball joint directo sobre cuerpo con masa real -->
+                <body name="drone_3d" pos="0 0 -0.30">
+                  <joint name="ball_joint" type="ball"
+                         stiffness="0" damping="0.05" limited="false"/>
+
+                  <geom name="drone_body" type="box" size="0.04 0.04 0.02"
+                        material="MatDrone" mass="0.30"
+                        contype="0" conaffinity="0"/>
+                  <site name="com_site" pos="0 0 0" size="0.005" rgba="1 0 0 1"/>
+
+                  <geom name="arm_x_pos" type="box" pos=" 0.10 0 0"
+                        size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1"
+                        mass="0.02" contype="0" conaffinity="0"/>
+                  <geom name="arm_x_neg" type="box" pos="-0.10 0 0"
+                        size="0.06 0.01 0.01" rgba="0.8 0.8 0.8 1"
+                        mass="0.02" contype="0" conaffinity="0"/>
+                  <geom name="arm_y_pos" type="box" pos="0  0.10 0"
+                        size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1"
+                        mass="0.02" contype="0" conaffinity="0"/>
+                  <geom name="arm_y_neg" type="box" pos="0 -0.10 0"
+                        size="0.01 0.06 0.01" rgba="0.8 0.8 0.8 1"
+                        mass="0.02" contype="0" conaffinity="0"/>
+
+                  <body name="prop0" pos=" 0.16  0.00 0.03">
+                    <geom type="cylinder" size="0.03 0.003"
+                          rgba="0.3 1 0.3 0.6" contype="0" conaffinity="0" mass="0.005"/>
+                    <site name="motor0" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+                  </body>
+                  <body name="prop1" pos="-0.16  0.00 0.03">
+                    <geom type="cylinder" size="0.03 0.003"
+                          rgba="0.3 1 0.3 0.6" contype="0" conaffinity="0" mass="0.005"/>
+                    <site name="motor1" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+                  </body>
+                  <body name="prop2" pos=" 0.00  0.16 0.03">
+                    <geom type="cylinder" size="0.03 0.003"
+                          rgba="0.3 1 0.3 0.6" contype="0" conaffinity="0" mass="0.005"/>
+                    <site name="motor2" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+                  </body>
+                  <body name="prop3" pos=" 0.00 -0.16 0.03">
+                    <geom type="cylinder" size="0.03 0.003"
+                          rgba="0.3 1 0.3 0.6" contype="0" conaffinity="0" mass="0.005"/>
+                    <site name="motor3" pos="0 0 0.003" size="0.008" rgba="0 1 0 0.7" type="cylinder"/>
+                  </body>
+
+                  <site name="x_axis" type="box" pos="0.20 0 0"
+                        size="0.20 0.003 0.003" rgba="1 0 0 0.3"/>
+                  <site name="y_axis" type="box" pos="0 0.20 0"
+                        size="0.003 0.20 0.003" rgba="0 1 0 0.3"/>
+                  <site name="z_axis" type="box" pos="0 0 0.20"
+                        size="0.003 0.003 0.20" rgba="0 0 1 0.3"/>
+
+                </body> <!-- /drone_3d -->
+              </body>   <!-- /seg5     -->
+            </body>     <!-- /seg4     -->
+          </body>       <!-- /seg3     -->
+        </body>         <!-- /seg2     -->
+      </body>           <!-- /seg1     -->
+    </body>             <!-- /anchor   -->
+
+    <!-- Flecha mocap roja: F_des -->
+    <body name="force_arrow_1" mocap="true" pos="0 0 0">
+      <geom name="force_geom_1" type="capsule" size="0.01 0.10"
+            rgba="1 0 0 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+    <!-- Flecha mocap azul: F estimado -->
+    <body name="force_arrow_2" mocap="true" pos="0 0 0">
+      <geom name="force_geom_2" type="capsule" size="0.01 0.10"
+            rgba="0 0 1 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+    <!-- Esfera mocap -->
+    <body name="point_marker_1" mocap="true" pos="0 0 0">
+      <geom name="point_geom_1" type="sphere" size="0.02"
+            rgba="1 0 0 1" contype="0" conaffinity="0" mass="0"/>
+    </body>
+
+  </worldbody>
+
+  <!-- ═══════════════════════════════════
+       ACTUADORES
+       ↓ THRUST_MAX: cambiar "10" en ctrlrange ↓
+  ════════════════════════════════════ -->
+  <actuator>
+    <general name="u1_thrust" site="com_site"
+             ctrllimited="true" ctrlrange="0 10"
+             gear="0 0 1  0 0 0"/>
+    <general name="u2_tau_x"  site="com_site"
+             ctrllimited="true" ctrlrange="-1 1"
+             gear="0 0 0  1 0 0"/>
+    <general name="u3_tau_y"  site="com_site"
+             ctrllimited="true" ctrlrange="-1 1"
+             gear="0 0 0  0 1 0"/>
+    <general name="u4_tau_z"  site="com_site"
+             ctrllimited="true" ctrlrange="-0.2 0.2"
+             gear="0 0 0  0 0 1"/>
+  </actuator>
+
+  <sensor>
+    <framepos    name="pos_drone"    objtype="body" objname="drone_3d"/>
+    <framequat   name="quat_drone"   objtype="body" objname="drone_3d"/>
+    <framelinvel name="linvel_drone" objtype="body" objname="drone_3d"/>
+    <frameangvel name="rotvel_drone" objtype="body" objname="drone_3d"/>
+
+    <jointpos name="s_root_rx" joint="root_rx"/>
+    <jointpos name="s_root_ry" joint="root_ry"/>
+    <jointpos name="s_j12_rx"  joint="j12_rx"/>
+    <jointpos name="s_j12_ry"  joint="j12_ry"/>
+    <jointpos name="s_j23_rx"  joint="j23_rx"/>
+    <jointpos name="s_j23_ry"  joint="j23_ry"/>
+    <jointpos name="s_j34_rx"  joint="j34_rx"/>
+    <jointpos name="s_j34_ry"  joint="j34_ry"/>
+    <jointpos name="s_j45_rx"  joint="j45_rx"/>
+    <jointpos name="s_j45_ry"  joint="j45_ry"/>
+
+    <ballquat   name="s_ball_quat"   joint="ball_joint"/>
+    <ballangvel name="s_ball_angvel" joint="ball_joint"/>
+  </sensor>
+
+</mujoco>
