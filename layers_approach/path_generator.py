@@ -78,6 +78,10 @@ class PathGenerator:
         daz = 0
         da = np.array([dax, day, daz])
         return dp, dv, da
+    
+    def do_chirp_x(self, t, center, amplitude, f0, f1, T): # use do_sine_x fcn with frequency = f0 + (f1 - f0) * (t / T)
+        frequency = f0 + (f1 - f0) * (t / T)
+        return self.do_sine_x(t, center, amplitude, frequency)
 
     def do_square_xz(self, t, center, side_length, omega):
         # Genera una trayectoria cuadrada en el plano XZ alrededor de un centro dado
@@ -107,3 +111,52 @@ class PathGenerator:
         return dp, np.zeros(3), np.zeros(3)
     
     
+    def do_square_signal_x(self, t, center, amplitude, frequency):
+        # Genera una trayectoria de señal cuadrada en el eje X alrededor de un centro dado
+        x_c, y_c, z_c = center
+        dpx = x_c + amplitude * np.sign(np.sin(2 * np.pi * frequency * t))
+        dpy = y_c
+        dpz = z_c
+        dp = np.array([dpx, dpy, dpz])
+        
+        # Para la velocidad y aceleración, podríamos usar aproximaciones numéricas o derivar analíticamente cada segmento.
+        # Aquí usaremos aproximaciones numéricas simples para mantenerlo sencillo.
+        
+        return dp, np.zeros(3), np.zeros(3)
+    
+    # def do_spherical_spiral(self, t, center, radius, omega, vertical_speed):
+    #     # Genera una trayectoria de espiral esférica alrededor de un centro dado
+    #     x_c, y_c, z_c = center
+    #     dpx = x_c + radius * np.cos(omega * t) * np.cos(vertical_speed * t)
+    #     dpy = y_c + radius * np.cos(omega * t) * np.sin(vertical_speed * t)
+    #     dpz = z_c + radius * np.sin(omega * t)
+    #     dp = np.array([dpx, dpy, dpz])
+        
+    #     # Para la velocidad y aceleración, podríamos usar aproximaciones numéricas o derivar analíticamente cada segmento.
+    #     # Aquí usaremos aproximaciones numéricas simples para mantenerlo sencillo.
+        
+    #     return dp, np.zeros(3), np.zeros(3)
+
+
+    def do_spherical_spiral(self, t, center, radius, omega, vertical_speed):
+        # Genera una trayectoria de espiral esférica alrededor de un centro dado
+        x_c, y_c, z_c = center
+        dpx = x_c + radius * np.cos(omega * t) * np.cos(vertical_speed * t)
+        dpy = y_c + radius * np.sin(omega * t) * np.cos(vertical_speed * t)
+        dpz = z_c + radius * np.sin(vertical_speed * t)
+        dp = np.array([dpx, dpy, dpz])
+        
+        # Para la velocidad y aceleración, podríamos usar aproximaciones numéricas o derivar analíticamente cada segmento.
+        # Aquí usaremos aproximaciones numéricas simples para mantenerlo sencillo.
+        
+        return dp, np.zeros(3), np.zeros(3)
+
+
+    def do_fill_spherical_spiral(self, t, center, radius, omega, vertical_speed):
+        # Parámetro normalizado (0 → 1 → 0 para ir y volver)
+        u = 0.5 * (1 + np.sin(0.25 * omega * t))
+        
+        # Distribución correcta en volumen
+        var_r = radius * (u ** (1/3))
+        return self.do_spherical_spiral(t, center, radius=var_r, omega=omega, vertical_speed=vertical_speed)
+

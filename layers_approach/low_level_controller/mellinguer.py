@@ -49,6 +49,8 @@ class MellinguerController:
         if np.linalg.norm(F_des) < 1e-9: # seguridad numérica, evitar fuerza nula que puede causar problemas en orientación deseada
             F_des = np.array([0.0, 0.0, self.mass * self.gravity])
 
+        # # limitador, no hay fuerzas verticales menores a -mg (que serían fuerzas de tracción hacia abajo, imposibles)
+        # F_des[2] = max(F_des[2], -self.mass*self.gravity)
         return F_des
 
 

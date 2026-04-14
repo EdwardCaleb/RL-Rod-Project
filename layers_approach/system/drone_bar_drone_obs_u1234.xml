@@ -64,58 +64,65 @@
           drone_B attach = ( 0.75, 0, 0.05)
     -->
 
-    <!-- BARRA FLEXIBLE -->
-    <body name="seg1" pos="-0.60 0 0.012">
+    <!--
+      CLAVE DE ESTA VERSIÓN:
+      cada body de segmento tiene su ORIGEN EN EL EXTREMO IZQUIERDO,
+      no en el centro. Así, la articulación entre segmentos ocurre en el
+      extremo correcto y no en la mitad del cilindro.
+    -->
+
+    <!-- BARRA FLEXIBLE: longitud total = 1.50 m -->
+    <body name="seg1" pos="-0.75 0 0.018">
       <joint name="seg1_free" type="free"/>
 
-      <geom name="g_seg1" type="cylinder" size="0.012 0.15"
+      <site name="site_bar_A" pos="0 0 0" size="0.01" rgba="1 1 0 1"/>
+      <geom name="g_j0" type="sphere" size="0.012" pos="0 0 0"
+            material="mat_joint" mass="0.001" contype="2" conaffinity="1"/>
+      <geom name="g_seg1" type="cylinder" size="0.012 0.15" pos="0.15 0 0"
             euler="0 1.57079632679 0"
-            material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
-      <geom name="g_j0" type="sphere" size="0.018" pos="-0.15 0 0"
-            material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
-      <geom name="g_j1" type="sphere" size="0.018" pos=" 0.15 0 0"
-            material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
-
-      <site name="site_bar_A" pos="-0.15 0 0" size="0.01" rgba="1 1 0 1"/>
+            material="mat_segment" mass="0.10112" contype="2" conaffinity="1"/>
+      <geom name="g_j1" type="sphere" size="0.012" pos="0.30 0 0"
+            material="mat_joint" mass="0.001" contype="2" conaffinity="1"/>
 
       <body name="seg2" pos="0.30 0 0">
         <joint name="j12_ry" class="spring_hinge" axis="0 1 0"/>
         <joint name="j12_rz" class="spring_hinge" axis="0 0 1"/>
-        <geom name="g_seg2" type="cylinder" size="0.012 0.15"
+        <geom name="g_seg2" type="cylinder" size="0.012 0.15" pos="0.15 0 0"
               euler="0 1.57079632679 0"
-              material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
-        <geom name="g_j2" type="sphere" size="0.018" pos="0.15 0 0"
-              material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+              material="mat_segment" mass="0.10112" contype="2" conaffinity="1"/>
+        <geom name="g_j2" type="sphere" size="0.012" pos="0.30 0 0"
+              material="mat_joint" mass="0.001" contype="2" conaffinity="1"/>
 
         <body name="seg3" pos="0.30 0 0">
           <joint name="j23_ry" class="spring_hinge" axis="0 1 0"/>
           <joint name="j23_rz" class="spring_hinge" axis="0 0 1"/>
-          <geom name="g_seg3" type="cylinder" size="0.012 0.15"
+          <geom name="g_seg3" type="cylinder" size="0.012 0.15" pos="0.15 0 0"
                 euler="0 1.57079632679 0"
-                material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
-          <geom name="g_j3" type="sphere" size="0.018" pos="0.15 0 0"
-                material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+                material="mat_segment" mass="0.10112" contype="2" conaffinity="1"/>
+          <geom name="g_j3" type="sphere" size="0.012" pos="0.30 0 0"
+                material="mat_joint" mass="0.001" contype="2" conaffinity="1"/>
 
           <body name="seg4" pos="0.30 0 0">
             <joint name="j34_ry" class="spring_hinge" axis="0 1 0"/>
             <joint name="j34_rz" class="spring_hinge" axis="0 0 1"/>
-            <geom name="g_seg4" type="cylinder" size="0.012 0.15"
+            <geom name="g_seg4" type="cylinder" size="0.012 0.15" pos="0.15 0 0"
                   euler="0 1.57079632679 0"
-                  material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
-            <geom name="g_j4" type="sphere" size="0.018" pos="0.15 0 0"
-                  material="mat_joint" contype="0" conaffinity="0" mass="0.002"/>
+                  material="mat_segment" mass="0.10112" contype="2" conaffinity="1"/>
+            <geom name="g_j4" type="sphere" size="0.012" pos="0.30 0 0"
+                  material="mat_joint" mass="0.001" contype="2" conaffinity="1"/>
 
             <body name="seg5" pos="0.30 0 0">
               <joint name="j45_ry" class="spring_hinge" axis="0 1 0"/>
               <joint name="j45_rz" class="spring_hinge" axis="0 0 1"/>
-              <geom name="g_seg5" type="cylinder" size="0.012 0.15"
+              <geom name="g_seg5" type="cylinder" size="0.012 0.15" pos="0.15 0 0"
                     euler="0 1.57079632679 0"
-                    material="mat_segment" mass="0.00112" contype="2" conaffinity="1"/>
+                    material="mat_segment" mass="0.10112" contype="2" conaffinity="1"/>
+              <geom name="g_j5" type="sphere" size="0.012" pos="0.30 0 0"
+                    material="mat_joint" mass="0.001" contype="2" conaffinity="1"/>
 
-              <geom name="g_socket_B" type="sphere" size="0.022" pos="0.15 0 0"
+              <geom name="g_socket_B" type="sphere" size="0.022" pos="0.30 0 0"
                     material="mat_socket" contype="0" conaffinity="0" mass="0"/>
-
-              <site name="site_bar_B" pos="0.15 0 0" size="0.01" rgba="1 1 0 1"/>
+              <site name="site_bar_B" pos="0.30 0 0" size="0.01" rgba="1 1 0 1"/>
             </body>
           </body>
         </body>
@@ -123,16 +130,16 @@
     </body>
 
     <!-- DRONE A: izquierda -->
-    <body name="drone_A" pos="-0.79 0 0.02">
+    <body name="drone_A" pos="-0.75 0 0.02">
       <joint name="drone_A_free" type="free"/>
 
       <geom name="drone_A_body" type="box" size="0.04 0.04 0.02"
             material="MatDroneA" mass="0.30" contype="2" conaffinity="1"/>
-      <geom name="g_socket_A" type="sphere" size="0.022" pos="0.04 0 -0.008"
+      <geom name="g_socket_A" type="sphere" size="0.022" pos="0 0 -0.008"
             material="mat_socket" contype="0" conaffinity="0" mass="0"/>
 
       <site name="com_site_A" pos="0 0 0" size="0.005" rgba="1 0.5 0 1"/>
-      <site name="site_drone_A_joint" pos="0.04 0 -0.008" size="0.01" rgba="0 1 1 1"/>
+      <site name="site_drone_A_joint" pos="0 0 -0.008" size="0.01" rgba="0 1 1 1"/>
 
       <geom name="arm_A_xp" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01"
             rgba="0.8 0.8 0.8 1" mass="0.02" contype="2" conaffinity="1"/>
@@ -145,16 +152,16 @@
     </body>
 
     <!-- DRONE B: derecha -->
-    <body name="drone_B" pos="0.79 0 0.02">
+    <body name="drone_B" pos="0.75 0 0.02">
       <joint name="drone_B_free" type="free"/>
 
       <geom name="drone_B_body" type="box" size="0.04 0.04 0.02"
             material="MatDroneB" mass="0.30" contype="2" conaffinity="1"/>
-      <geom name="g_socket_B2" type="sphere" size="0.022" pos="-0.04 0 -0.008"
+      <geom name="g_socket_B2" type="sphere" size="0.022" pos="-0 0 -0.008"
             material="mat_socket" contype="0" conaffinity="0" mass="0"/>
 
       <site name="com_site_B" pos="0 0 0" size="0.005" rgba="0 0.5 1 1"/>
-      <site name="site_drone_B_joint" pos="-0.04 0 -0.008" size="0.01" rgba="0 1 1 1"/>
+      <site name="site_drone_B_joint" pos="0 0 -0.008" size="0.01" rgba="0 1 1 1"/>
 
       <geom name="arm_B_xp" type="box" pos=" 0.10 0 0" size="0.06 0.01 0.01"
             rgba="0.9 0.5 0.5 1" mass="0.02" contype="2" conaffinity="1"/>

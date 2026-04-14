@@ -1,4 +1,5 @@
 
+import numpy as np
 
 class LowPassForceFilter:
     def __init__(self, alpha = 0.5):
@@ -30,7 +31,15 @@ class MovingAverageForgettingFactorFilter:
         self.forgetting_factor = forgetting_factor
         self.force_history = []
 
-    def filter(self, force_measurement):
+    # limit the force depending on its magnitude, to avoid outliers dominating the estimation. This is optional and can be tuned based on expected force ranges.
+    def limiter(self, force_measurement, max_force=50.0):
+        if np.linalg.norm(force_measurement) > max_force:
+            return max_force * force_measurement / np.linalg.norm(force_measurement)  # scale down to max_force while keeping the direction
+        return force_measurement
+
+    def filter(self, force_measurement, limit=True, max_force=50.0):
+        if limit:
+            force_measurement = self.limiter(force_measurement, max_force=max_force)
         self.force_history.append(force_measurement)
         if len(self.force_history) > self.window_size:
             self.force_history.pop(0)
