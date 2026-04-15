@@ -94,3 +94,123 @@ class VectorRLS:
         )
 
         return F_hat.flatten(), error.flatten()
+    
+
+
+
+
+
+
+
+import numpy as np
+
+class RLS:
+    """
+    Recursive Least Squares (RLS) Algorithm
+    Notación basada en:
+        π(n), k(n), ξ(n), P(n), w(n)
+
+    Modelo:
+        d(n) ≈ w^T u(n)
+
+    Soporta:
+        - salida escalar
+        - salida vectorial (multi-output)
+    """
+
+    def __init__(self, n_features, n_outputs=1, lambda_=0.99, delta=1.0):
+        """
+        Parámetros:
+        ----------
+        n_features : int
+            Dimensión de u(n) (vector de entrada)
+        
+        n_outputs : int
+            Dimensión de la salida (1 = escalar, >1 = vector)
+        
+        lambda_ : float
+            Factor de olvido (0 < λ ≤ 1)
+        
+        delta : float
+            Inicialización de P(0) = (1/δ) I
+            - pequeño δ → aprendizaje rápido
+            - grande δ → más robusto al ruido
+        """
+
+        self.n = n_features
+        self.m = n_outputs
+        self.lambda_ = lambda_
+
+        # Parámetros estimados w(n)
+        # Dimensión: (n_features x n_outputs)
+        self.w = np.zeros((self.n, self.m))
+
+        # Matriz de covarianza inversa P(n)
+        self.P = (1.0 / delta) * np.eye(self.n)
+
+    def getWmatrix(self):
+        return self.w
+    
+
+    def predict(self, u):
+        """
+        Predicción:
+            d_hat(n) = w^T u(n)
+        """
+        u = u.reshape(-1, 1)  # (n x 1)
+        d_hat = self.w.T @ u  # (m x 1)
+        return d_hat.flatten()
+
+    def update(self, u, d):
+        """
+        Ejecuta UNA iteración del algoritmo RLS:
+
+        Entrada:
+        --------
+        u : (n,)
+            vector de entrada u(n)
+        
+        d : (m,) o escalar
+            salida real d(n)
+
+        Retorna:
+        --------
+        d_hat : predicción
+        xi    : error
+        """
+
+        # Asegurar dimensiones correctas
+        u = u.reshape(-1, 1)          # (n x 1)
+        d = np.array(d).reshape(-1, 1)  # (m x 1)
+
+        # --------------------------------------------------
+        # 1. π(n) = P(n-1) u(n)
+        # --------------------------------------------------
+        pi = self.P @ u               # (n x 1)
+
+        # --------------------------------------------------
+        # 2. k(n) = π(n) / (λ + u^T π(n))
+        # --------------------------------------------------
+        denom = self.lambda_ + (u.T @ pi)  # escalar
+        k = pi / denom                     # (n x 1)
+
+        # --------------------------------------------------
+        # 3. ξ(n) = d(n) - w^T(n-1) u(n)
+        # --------------------------------------------------
+        d_hat = self.w.T @ u              # (m x 1)
+        xi = d - d_hat                    # (m x 1)
+
+        # --------------------------------------------------
+        # 4. w(n) = w(n-1) + k(n) ξ(n)^T
+        # (outer product si m > 1)
+        # --------------------------------------------------
+        self.w = self.w + k @ xi.T        # (n x m)
+
+        # --------------------------------------------------
+        # 5. P(n) = λ⁻¹ [P(n-1) - k(n) u^T(n) P(n-1)]
+        # --------------------------------------------------
+        self.P = (1.0 / self.lambda_) * (
+            self.P - k @ (u.T @ self.P)
+        )
+
+        return d_hat.flatten(), xi.flatten()

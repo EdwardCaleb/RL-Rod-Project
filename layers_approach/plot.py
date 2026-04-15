@@ -54,7 +54,7 @@ def plot_force_vs_time(axt, F_1, name_1=None, linestyle_1='-' , color_1='blue',
     if F_7 is not None:
         plt.plot(axt, F_7, label=name_7, linestyle=linestyle_7, color=color_7)
     plt.xlabel('Paso de tiempo (s)')
-    plt.ylabel('Fuerza (N)')
+    plt.ylabel('Modulo de Fuerza (N)')
     plt.legend()
     plt.show()
 
@@ -74,6 +74,130 @@ def plot(ejex,var_1,name_1='',var_2=None,name_2='',var_3=None,name_3='',var_4=No
     plt.title(title)
     plt.legend()
     plt.show()
+
+
+
+def plot_vector_field_3d(model, grid_lim=1.5, center=np.array([0.0, 0.0, 2.0]), n_points=6, scale=1.0, title="Campo de fuerzas"):
+    x = np.linspace(center[0] - grid_lim, center[0] + grid_lim, n_points)
+    y = np.linspace(center[1] - grid_lim, center[1] + grid_lim, n_points)
+    z = np.linspace(center[2] - grid_lim, center[2] + grid_lim, n_points)
+
+    X, Y, Z = np.meshgrid(x, y, z)
+
+    U = np.zeros_like(X)
+    V = np.zeros_like(Y)
+    W = np.zeros_like(Z)
+    magnitude = np.zeros_like(X)
+
+    # Evaluar modelo
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            for k in range(X.shape[2]):
+                phi = np.array([X[i,j,k], Y[i,j,k], Z[i,j,k], 1.0])
+                F = model.predict(phi)
+
+                U[i,j,k] = F[0]
+                V[i,j,k] = F[1]
+                W[i,j,k] = F[2]
+
+                magnitude[i,j,k] = np.linalg.norm(F)
+
+    # Escalar vectores (opcional pero recomendado)
+    U_scaled = U * scale
+    V_scaled = V * scale
+    W_scaled = W * scale
+
+    # Normalizar magnitud para colores
+    mag_norm = magnitude / (np.max(magnitude) + 1e-8)
+
+    colors = plt.cm.viridis(mag_norm.flatten())
+
+    # Plot
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    ax.quiver(
+        X, Y, Z,
+        U_scaled, V_scaled, W_scaled,
+        color=colors,
+        length=1.0,   # base length
+        normalize=False
+    )
+
+    # añadir un punto en el centro para referencia, el punto no es muy grande para no tapar las flechas, pero se ve claramente
+    ax.scatter(center[0], center[1], center[2], color='red', s=20, label=f'Referencia ({center[0]},{center[1]},{center[2]})')
+    
+    ax.set_title(title)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+
+    plt.show()
+
+
+
+# plot_true_vector_field_3d(vector_F_res, vector_r, grid_lim=2.5, n_points=10, scale=0.03, title="Campo de fuerzas real del resorte")
+def plot_true_vector_field_3d(grid_lim=1.5, center=np.array([0.0, 0.0, 2.0]), n_points=6, scale=1.0, title="Campo de fuerzas"):
+    from system.spring_models import linear_spring_force
+
+    x = np.linspace(center[0] - grid_lim, center[0] + grid_lim, n_points)
+    y = np.linspace(center[1] - grid_lim, center[1] + grid_lim, n_points)
+    z = np.linspace(center[2] - grid_lim, center[2] + grid_lim, n_points)
+
+    X, Y, Z = np.meshgrid(x, y, z)
+
+    U = np.zeros_like(X)
+    V = np.zeros_like(Y)
+    W = np.zeros_like(Z)
+    magnitude = np.zeros_like(X)
+
+    # Evaluar modelo
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            for k in range(X.shape[2]):
+                phi = np.array([X[i,j,k], Y[i,j,k], Z[i,j,k], 1.0])
+                
+                r = np.array([X[i,j,k], Y[i,j,k], Z[i,j,k]])
+                F = linear_spring_force(r, center)
+
+                U[i,j,k] = F[0]
+                V[i,j,k] = F[1]
+                W[i,j,k] = F[2]
+
+                magnitude[i,j,k] = np.linalg.norm(F)
+
+    # Escalar vectores (opcional pero recomendado)
+    U_scaled = U * scale
+    V_scaled = V * scale
+    W_scaled = W * scale
+
+    # Normalizar magnitud para colores
+    mag_norm = magnitude / (np.max(magnitude) + 1e-8)
+
+    colors = plt.cm.viridis(mag_norm.flatten())
+
+    # Plot
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    ax.quiver(
+        X, Y, Z,
+        U_scaled, V_scaled, W_scaled,
+        color=colors,
+        length=1.0,   # base length
+        normalize=False
+    )
+
+    # añadir un punto en el centro para referencia, el punto no es muy grande para no tapar las flechas, pero se ve claramente
+    ax.scatter(center[0], center[1], center[2], color='red', s=20, label=f'Referencia ({center[0]},{center[1]},{center[2]})')
+    
+    ax.set_title(title)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+
+    plt.show()
+
 
 
 # # visualización de trayectoria (opcional)

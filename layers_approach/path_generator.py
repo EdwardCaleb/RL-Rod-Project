@@ -2,17 +2,26 @@
 import numpy as np
 
 class PathGenerator:
-    def __init__(self):
-        self.p = np.zeros(3)  # posición actual del drone
-        self.v = np.zeros(3)  # velocidad actual del drone
-        self.a = np.zeros(3)  # aceleración actual del drone
+    def __init__(self, dt=0.01):
+        self.dt = dt
+        self.dp = np.zeros(3)  # posición actual del drone
+        self.dv = np.zeros(3)  # velocidad actual del drone
+        self.da = np.zeros(3)  # aceleración actual del drone
         self.t = 0.0          # tiempo actual
+        self.prev_dp = np.zeros(3)  # posición anterior (para cálculo de velocidad numérica)
+        self.prev_dv = np.zeros(3)  # velocidad anterior (para cálculo de aceleración numérica)
+        self.prev_da = np.zeros(3)  # aceleración anterior (para cálculo de jerk numérico)
 
-    def update_state(self, p, v, a, t):
-        self.p = p
-        self.v = v
-        self.a = a
+    def update_des_state(self, dp, dv, da, t):
+        self.dp = dp
+        self.dv = dv
+        self.da = da
         self.t = t
+
+    def update_prev_des_state(self):
+        self.prev_dp = self.dp
+        self.prev_dv = self.dv
+        self.prev_da = self.da
 
     def fixed_point(self, point):
         # Genera una trayectoria que simplemente mantiene el drone en un punto fijo
@@ -56,6 +65,25 @@ class PathGenerator:
         # hallamos aceleración derivando la velocidad
         dax = -radius * omega**2 * np.cos(omega * t)
         day = -radius * omega**2 * np.sin(omega * t)
+        daz = 0
+        da = np.array([dax, day, daz])
+        return dp, dv, da
+    
+    def do_elipse_xy(self, t, center, radius_x, radius_y, omega):
+        # Genera una trayectoria elíptica en el plano XY alrededor de un centro dado
+        x_c, y_c, z_c = center
+        dpx = x_c + radius_x * np.cos(omega * t)
+        dpy = y_c + radius_y * np.sin(omega * t)
+        dpz = z_c  # Mantiene la coordenada Z constante
+        dp = np.array([dpx, dpy, dpz])
+        # hallamos velocidad derivando la posición
+        dvx = -radius_x * omega * np.sin(omega * t)
+        dvy = radius_y * omega * np.cos(omega * t)
+        dvz = 0
+        dv = np.array([dvx, dvy, dvz])
+        # hallamos aceleración derivando la velocidad
+        dax = -radius_x * omega**2 * np.cos(omega * t)
+        day = -radius_y * omega**2 * np.sin(omega * t)
         daz = 0
         da = np.array([dax, day, daz])
         return dp, dv, da
@@ -153,10 +181,43 @@ class PathGenerator:
 
 
     def do_fill_spherical_spiral(self, t, center, radius, omega, vertical_speed):
+
+        self.update_prev_des_state()
+
         # Parámetro normalizado (0 → 1 → 0 para ir y volver)
         u = 0.5 * (1 + np.sin(0.25 * omega * t))
         
         # Distribución correcta en volumen
         var_r = radius * (u ** (1/3))
-        return self.do_spherical_spiral(t, center, radius=var_r, omega=omega, vertical_speed=vertical_speed)
 
+        x_c, y_c, z_c = center
+        dpx = x_c + var_r * np.cos(omega * t) * np.cos(vertical_speed * t)
+        dpy = y_c + var_r * np.sin(omega * t) * np.cos(vertical_speed * t)
+        dpz = z_c + var_r * np.sin(vertical_speed * t)
+        dp = np.array([dpx, dpy, dpz])
+
+        return dp, np.zeros(3), np.zeros(3)
+    
+
+
+    def get_vel_acc_from_pos(self, dp, t):
+        # Aproximación numérica de la velocidad a partir de la posición
+        self.dp = dp
+
+        self.update_des_state(dp, np.zeros(3), np.zeros(3), t)
+
+        dvx = (self.dp[0] - self.prev_dp[0]) / self.dt
+        dvy = (self.dp[1] - self.prev_dp[1]) / self.dt
+        dvz = (self.dp[2] - self.prev_dp[2]) / self.dt
+        dv = np.array([dvx, dvy, dvz])
+
+        self.dv = dv
+
+        dax = (dv[0] - self.prev_dv[0]) / self.dt
+        day = (dv[1] - self.prev_dv[1]) / self.dt
+        daz = (dv[2] - self.prev_dv[2]) / self.dt
+        da = np.array([dax, day, daz])
+
+        self.da = da
+
+        return dv, da
