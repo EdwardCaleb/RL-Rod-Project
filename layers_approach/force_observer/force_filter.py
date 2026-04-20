@@ -9,8 +9,57 @@ class LowPassForceFilter:
     def filter(self, force_measurement):
         self.filtered_force = self.alpha * force_measurement + (1 - self.alpha) * self.filtered_force
         return self.filtered_force
+    
+    def limiter(self, force_measurement, max_force=50.0):
+        if np.linalg.norm(force_measurement) > max_force:
+            return max_force * force_measurement / np.linalg.norm(force_measurement)  # scale down to max_force while keeping the direction
+        return force_measurement
 
 
+
+
+import numpy as np
+from scipy.signal import butter, lfilter
+
+class LowPassButterworth:
+    def __init__(self, cutoff_freq, fs, order=2, dim=1):
+        self.cutoff_freq = cutoff_freq
+        self.fs = fs
+        self.order = order
+        self.dim = dim
+        
+        nyquist = 0.5 * fs
+        normal_cutoff = cutoff_freq / nyquist
+        
+        self.b, self.a = butter(order, normal_cutoff, btype='low')
+        
+        # Estado por dimensión
+        self.zi = [np.zeros(max(len(self.a), len(self.b)) - 1) for _ in range(dim)]
+
+    def filter(self, signal):
+        signal = np.asarray(signal)
+
+        # Caso escalar
+        if signal.ndim == 0 or self.dim == 1:
+            filtered, self.zi[0] = lfilter(self.b, self.a, [signal], zi=self.zi[0])
+            return filtered[0]
+
+        # Caso vector
+        output = np.zeros_like(signal)
+        for i in range(self.dim):
+            filtered, self.zi[i] = lfilter(self.b, self.a, [signal[i]], zi=self.zi[i])
+            output[i] = filtered[0]
+
+        return output
+
+    def limiter(self, force_measurement, max_force=50.0):
+        norm = np.linalg.norm(force_measurement)
+        if norm > max_force:
+            return max_force * force_measurement / norm
+        return force_measurement
+    
+
+    
 
 class MovingAverageForceFilter:
     def __init__(self, window_size = 5):

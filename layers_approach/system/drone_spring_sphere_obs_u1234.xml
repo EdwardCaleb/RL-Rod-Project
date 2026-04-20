@@ -15,7 +15,7 @@
 
   <compiler angle="radian"/>
 
-  <option timestep="0.001"
+  <option timestep="0.01"
           gravity="0 0 -9.81"
           integrator="implicitfast"
           solver="Newton"
@@ -149,7 +149,7 @@
   <tendon>
     <spatial name="spring_bar"
              stiffness="10"
-             springlength="1.0"
+             springlength="0.0"
              damping="0.0"
              width="0.010"
              rgba="0.65 0.42 0.18 1">

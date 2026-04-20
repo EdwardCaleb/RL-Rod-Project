@@ -38,7 +38,8 @@ def plot_force_vs_time(axt, F_1, name_1=None, linestyle_1='-' , color_1='blue',
                        F_4=None, name_4=None, linestyle_4=':' , color_4='red',
                        F_5=None, name_5=None, linestyle_5='-' , color_5='purple',
                        F_6=None, name_6=None, linestyle_6='--', color_6='brown',
-                       F_7=None, name_7=None, linestyle_7='-.', color_7='pink'):
+                       F_7=None, name_7=None, linestyle_7='-.', color_7='pink',
+                       title='Fuerza vs Tiempo', xlabel='Tiempo (s)', ylabel='Fuerza (N)'):
     plt.figure()
     if F_1 is not None:
         plt.plot(axt, F_1, label=name_1, linestyle=linestyle_1, color=color_1)
@@ -54,8 +55,9 @@ def plot_force_vs_time(axt, F_1, name_1=None, linestyle_1='-' , color_1='blue',
         plt.plot(axt, F_6, label=name_6, linestyle=linestyle_6, color=color_6)
     if F_7 is not None:
         plt.plot(axt, F_7, label=name_7, linestyle=linestyle_7, color=color_7)
-    plt.xlabel('Paso de tiempo (s)')
-    plt.ylabel('Modulo de Fuerza (N)')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
     plt.legend()
     plt.show()
 
