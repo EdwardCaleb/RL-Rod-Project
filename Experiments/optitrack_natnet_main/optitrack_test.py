@@ -19,7 +19,7 @@ def receive_rigid_body_frame(id, position, rotation_quaternion):
 
 
 if __name__ == "__main__":
-    clientAddress = "192.168.56.1"
+    clientAddress = "192.168.0.99"
     optitrackServerAddress = "192.168.0.4"
     robot_id = 536
 
