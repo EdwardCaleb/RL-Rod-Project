@@ -221,3 +221,15 @@ class PathGenerator:
         self.da = da
 
         return dv, da
+    
+    def do_multistep_z(self, t, center, step_height, n_steps, step_duration):
+        # Genera una trayectoria que sube en escalones en el eje Z alrededor de un centro dado
+        x_c, y_c, z_c = center
+        total_duration = n_steps * step_duration
+        t_mod = t % total_duration
+        current_step = int(t_mod // step_duration)
+        dpx = x_c
+        dpy = y_c
+        dpz = z_c + step_height * current_step
+        dp = np.array([dpx, dpy, dpz])
+        return dp, np.zeros(3), np.zeros(3)

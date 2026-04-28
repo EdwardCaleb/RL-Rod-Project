@@ -23,9 +23,13 @@ class FullStateEstimator:
 
 
 
-    def update_state_p_q(self, p, q, dt=None):
+    def update_state_p_q(self, p, q, dt=None, input_format="xyzw"):
         if dt is not None:
             self.dt = dt
+
+        # Reordenar quaternion si es necesario
+        if input_format == "xyzw":
+            q = np.array([q[3], q[0], q[1], q[2]])
 
         # Normalizar quaternion
         q = q / np.linalg.norm(q)

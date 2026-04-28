@@ -15,11 +15,12 @@ from path_generator import PathGenerator
 from full_state_estimator import FullStateEstimator
 
 
+
 # =========================
 # CONFIG
 # =========================
 URI = 'radio://0/90/2M/E7E7E7E705'
-robot_id = 537
+robot_id = 538
 
 logging.basicConfig(level=logging.ERROR)
 os.environ["CFCLIENT_CACHE_DIR"] = "./cache"
@@ -58,8 +59,13 @@ def log_callback(timestamp, data, logconf):
     vbat = data.get('pm.vbat', None)
 
     # imprimir cada ~100 ms
-    if timestamp % 100 == 0:
-        print(f"[{timestamp}] PWM: {total_pwm} | Force(N): {total_si} | Vbat: {vbat}")
+    # timestamp es un entero que avanza cada 5 valores (e.g., 2221350, 2221355, 2221360, ...), tomar eso en consideración para imprimir cada 100 ms
+    if (timestamp//10) % 10 == 0:
+        print(f"[{timestamp}] PWM: {total_pwm} | Uncapped: {total_uncapped} | Force(N): {total_si} | Vbat: {vbat}")
+    
+
+    # if (timestamp) % 10 == 0:
+    # print(f"[{timestamp}] PWM: {total_pwm} | Force(N): {total_si} | Vbat: {vbat}")
 
 
 def start_logging(cf):
@@ -109,7 +115,7 @@ def run_trajectory(cf):
     path = PathGenerator(dt=0.01)
 
     # 🛫 TAKEOFF
-    takeoff(cf, height=1.5, duration=2.0)
+    takeoff(cf, height=0.5, duration=2.0)
 
     t0 = time.time()
 
@@ -119,7 +125,8 @@ def run_trajectory(cf):
 
             # trayectoria (elige una)
             # dp = path.do_sine_x(t, center=[0,0,1.5], amplitude=0.3, frequency=0.2)
-            dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
+            dp, _ , _ = path.do_linear_z(t, center=np.array([0.0, 0.0, 0.5]), z_speed=0.04)
+            # dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
 
             dp = np.array(dp).flatten()
             x, y, z = map(float, dp)
@@ -133,7 +140,7 @@ def run_trajectory(cf):
 
     finally:
         print("Aterrizando...")
-        land(cf, height=1.5, duration=2.0)
+        land(cf, height=0.5, duration=2.0)
 
 
 # =========================
