@@ -3,7 +3,6 @@
 En este test:
 - Leemos el thrust en PWM y voltaje desde el Crazyflie
 - Estimamos la fuerza de thrust en newtons usando un modelo PWM a fuerza
-- Estimamos la fuerza exogena aplicada al drone en x, y, z usando un observador de fuerzas
 '''
 
 import time
@@ -24,29 +23,17 @@ from full_state_estimator import FullStateEstimator
 
 from PWM_to_force_thrust import PwMToForceThrust
 
-from force_observer import ForceObserver
-
 
 # =========================
 # CONFIG
 # =========================
 URI = 'radio://0/90/2M/E7E7E7E705'
-robot_id = 540
+robot_id = 538
 
 logging.basicConfig(level=logging.ERROR)
 os.environ["CFCLIENT_CACHE_DIR"] = "./cache"
 
 stop_event = threading.Event()
-
-latest_state = {
-    "p": None,
-    "v": None,
-    "a": None,
-    "R": None,
-    "force_thrust": None,
-    "force_external": None,
-}
-
 
 
 # =========================
@@ -76,10 +63,6 @@ def send_extpos_loop(cf, estimator):
 
             # 🔴 ESTIMACIÓN COMPLETA
             p, v, a, R = estimator.update_state_p_q(p, q, dt, input_format="xyzw")
-            latest_state["p"] = p
-            latest_state["v"] = v
-            latest_state["a"] = a
-            latest_state["R"] = R
 
             # enviar posición al Crazyflie
             cf.extpos.send_extpos(float(p[0]), float(p[1]), float(p[2]))
@@ -94,7 +77,7 @@ def send_extpos_loop(cf, estimator):
 # =========================
 # LOGGING + PWM model
 # =========================
-def log_callback(timestamp, data, logconf, pwm_model, force_observer):
+def log_callback(timestamp, data, logconf, pwm_model):
     total_pwm = data.get('propForce.totalPwm', None)
     vbat = data.get('pm.vbat', None)
 
@@ -102,39 +85,19 @@ def log_callback(timestamp, data, logconf, pwm_model, force_observer):
         return
     
     force_est = pwm_model.pwm_to_force(total_pwm, vbat)
-    latest_state["force_thrust"] = force_est
 
-
-    a = latest_state["a"]
-    R = latest_state["R"]
-
-    f_ext = None
-
-    if a is not None and R is not None:
-        f_ext = force_observer.observe(u1_sclr=force_est, drone_acceleration=a, R=R)
-        latest_state["force_external"] = f_ext
-    
 
     # imprimir cada ~100 ms
-    if (timestamp//10) % 10 == 0:
-        if f_ext is not None:
-            print(
-                f"[{timestamp}] "
-                f"PWM: {total_pwm} | "
-                f"Vbat: {vbat:.2f} | "
-                f"Force Est(N): {force_est:.3f} | "
-                f"External Force Est(N): [{f_ext[0]:.3f}, {f_ext[1]:.3f}, {f_ext[2]:.3f}] N | "
-                )
-        else:
-            print(
-                f"[{timestamp}] "
-                f"PWM: {total_pwm} | "
-                f"Vbat: {vbat:.2f} | "
-                f"Force Est(N): {force_est:.3f}"
+    if (timestamp//10) % 100 == 0:
+        print(
+            f"[{timestamp}] "
+            f"PWM: {total_pwm} | "
+            f"Vbat: {vbat:.2f} | "
+            f"Force Est(N): {force_est:.3f}"
         )
 
 
-def start_logging(cf, pwm_model, force_observer):
+def start_logging(cf, pwm_model):
     log_conf = LogConfig(name='PropForces', period_in_ms=10)
 
     log_conf.add_variable('propForce.totalPwm', 'uint32_t')
@@ -144,7 +107,7 @@ def start_logging(cf, pwm_model, force_observer):
 
     if log_conf.valid:
         log_conf.data_received_cb.add_callback(
-            lambda t, d, l: log_callback(t, d, l, pwm_model, force_observer)
+            lambda t, d, l: log_callback(t, d, l, pwm_model)
         )
         log_conf.start()
         print("Logging started...")
@@ -181,7 +144,7 @@ def run_trajectory(cf):
     path = PathGenerator(dt=0.01)
 
     # 🛫 TAKEOFF
-    takeoff(cf, height=1.5, duration=2.0)
+    takeoff(cf, height=0.5, duration=2.0)
 
     t0 = time.time()
 
@@ -194,8 +157,8 @@ def run_trajectory(cf):
             # dp, _ , _  = path.do_fill_spherical_spiral(t, center=np.array([0.0, 0.0, 1.5]), radius=0.5, omega=0.5*np.sqrt(2), vertical_speed=0.5*(2)**(1/4))
             # dp, _ , _  = path.do_square_xz(t, center=np.array([0.0, 0.0, 1.5]), side_length=1.0, omega=1.0)
             # dp, _ , _ = path.do_multistep_z(t, center=np.array([0.0, 0.0, 0.3]), step_height=0.4, n_steps=4, step_duration=4.0)
-            # dp, _ , _ = path.do_linear_z(t, center=np.array([0.0, 0.0, 0.5]), z_speed=0.10)
-            dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
+            dp, _ , _ = path.do_linear_z(t, center=np.array([0.0, 0.0, 0.5]), z_speed=0.10)
+            # dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
 
             dp = np.array(dp).flatten()
             x, y, z = map(float, dp)
@@ -209,7 +172,7 @@ def run_trajectory(cf):
 
     finally:
         print("Aterrizando...")
-        land(cf, height=1.5, duration=2.0)
+        land(cf, height=0.5, duration=2.0)
 
 
 # =========================
@@ -248,9 +211,6 @@ if __name__ == "__main__":
 
         # Modelo PWM a fuerza
         pwm_model = PwMToForceThrust()
-
-        # Force observer
-        force_observer = ForceObserver(drone_mass=0.153, gravity=9.81)
         
         # 🔹 Thread extpos
         extpos_thread = threading.Thread(
@@ -261,7 +221,7 @@ if __name__ == "__main__":
         extpos_thread.start()
 
         # 🔹 Logging
-        log_conf = start_logging(cf, pwm_model, force_observer)
+        log_conf = start_logging(cf, pwm_model)
 
         try:
             run_trajectory(cf)

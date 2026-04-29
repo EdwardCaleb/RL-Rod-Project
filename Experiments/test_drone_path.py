@@ -1,4 +1,10 @@
-﻿import time
+﻿'''
+Este test hace que el drone vuele siguiendo una trayectoria generada por el PathGenerator,
+mientras se le envían posiciones externas desde el tracker de OptiTrack
+'''
+
+
+import time
 import threading
 import numpy as np
 

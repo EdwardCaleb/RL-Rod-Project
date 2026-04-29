@@ -4,6 +4,7 @@ En este test:
 - Leemos el thrust en PWM y voltaje desde el Crazyflie
 - Estimamos la fuerza de thrust en newtons usando un modelo PWM a fuerza
 - Estimamos la fuerza exogena aplicada al drone en x, y, z usando un observador de fuerzas
+- Filtramos la fuerza exogena estimada para obtener una versión más suave y menos ruidosa
 '''
 
 import time
