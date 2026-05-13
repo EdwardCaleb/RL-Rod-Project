@@ -27,6 +27,8 @@ from PWM_to_force_thrust import PwMToForceThrust
 
 from force_observer import ForceObserver
 
+from force_filter import MovingAverageForgettingFactorFilter
+
 
 # =========================
 # CONFIG
@@ -95,7 +97,7 @@ def send_extpos_loop(cf, estimator):
 # =========================
 # LOGGING + PWM model
 # =========================
-def log_callback(timestamp, data, logconf, pwm_model, force_observer):
+def log_callback(timestamp, data, logconf, pwm_model, force_observer, force_filter):
     total_pwm = data.get('propForce.totalPwm', None)
     vbat = data.get('pm.vbat', None)
 
@@ -112,30 +114,27 @@ def log_callback(timestamp, data, logconf, pwm_model, force_observer):
     f_ext = None
 
     if a is not None and R is not None:
-        f_ext = force_observer.observe(u1_sclr=force_est, drone_acceleration=a, R=R)
-        latest_state["force_external"] = f_ext
-    
 
-    # imprimir cada ~100 ms
-    if (timestamp//10) % 10 == 0:
-        if f_ext is not None:
+        # 🔴 fuerza externa (raw)
+        f_ext = force_observer.observe(u1_sclr=force_est, drone_acceleration=a, R=R)
+
+        # 🟢 filtro
+        f_ext_filt = force_filter.filter(f_ext)
+
+        latest_state["force_external"] = f_ext_filt
+
+        if (timestamp//10) % 10 == 0:
             print(
                 f"[{timestamp}] "
                 f"PWM: {total_pwm} | "
                 f"Vbat: {vbat:.2f} | "
                 f"Force Est(N): {force_est:.3f} | "
                 f"External Force Est(N): [{f_ext[0]:.3f}, {f_ext[1]:.3f}, {f_ext[2]:.3f}] N | "
-                )
-        else:
-            print(
-                f"[{timestamp}] "
-                f"PWM: {total_pwm} | "
-                f"Vbat: {vbat:.2f} | "
-                f"Force Est(N): {force_est:.3f}"
-        )
+                f"External Force Est Filtrada(N): [{f_ext_filt[0]:.3f}, {f_ext_filt[1]:.3f}, {f_ext_filt[2]:.3f}] N"
+            )
 
 
-def start_logging(cf, pwm_model, force_observer):
+def start_logging(cf, pwm_model, force_observer, force_filter):
     log_conf = LogConfig(name='PropForces', period_in_ms=10)
 
     log_conf.add_variable('propForce.totalPwm', 'uint32_t')
@@ -145,7 +144,7 @@ def start_logging(cf, pwm_model, force_observer):
 
     if log_conf.valid:
         log_conf.data_received_cb.add_callback(
-            lambda t, d, l: log_callback(t, d, l, pwm_model, force_observer)
+            lambda t, d, l: log_callback(t, d, l, pwm_model, force_observer, force_filter)
         )
         log_conf.start()
         print("Logging started...")
@@ -252,6 +251,9 @@ if __name__ == "__main__":
 
         # Force observer
         force_observer = ForceObserver(drone_mass=0.153, gravity=9.81)
+
+        # Filtro de fuerza
+        force_filter = MovingAverageForgettingFactorFilter(window_size=50, forgetting_factor=0.99)
         
         # 🔹 Thread extpos
         extpos_thread = threading.Thread(
@@ -262,7 +264,7 @@ if __name__ == "__main__":
         extpos_thread.start()
 
         # 🔹 Logging
-        log_conf = start_logging(cf, pwm_model, force_observer)
+        log_conf = start_logging(cf, pwm_model, force_observer, force_filter)
 
         try:
             run_trajectory(cf)
