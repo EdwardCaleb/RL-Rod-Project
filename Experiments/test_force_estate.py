@@ -27,7 +27,7 @@ from full_state_estimator import FullStateEstimator
 # CONFIG
 # =========================
 URI = 'radio://0/90/2M/E7E7E7E705'
-robot_id = 538
+robot_id = 542
 
 logging.basicConfig(level=logging.ERROR)
 os.environ["CFCLIENT_CACHE_DIR"] = "./cache"
@@ -39,7 +39,7 @@ stop_event = threading.Event()
 # OPTITRACK
 # =========================
 tracker = tracker.OptiTrackClient(
-    client_address="192.168.0.99",
+    client_address="192.168.0.32",
     server_address="192.168.0.4"
 )
 tracker.start()

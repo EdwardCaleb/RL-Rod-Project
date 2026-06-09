@@ -31,7 +31,7 @@ from force_observer import ForceObserver
 # CONFIG
 # =========================
 URI = 'radio://0/90/2M/E7E7E7E705'
-robot_id = 540
+robot_id = 542
 
 logging.basicConfig(level=logging.ERROR)
 os.environ["CFCLIENT_CACHE_DIR"] = "./cache"
@@ -53,7 +53,7 @@ latest_state = {
 # OPTITRACK
 # =========================
 tracker = tracker.OptiTrackClient(
-    client_address="192.168.0.99",
+    client_address="192.168.0.32",
     server_address="192.168.0.4"
 )
 tracker.start()
@@ -157,7 +157,7 @@ def start_logging(cf, pwm_model, force_observer):
 # =========================
 # CONTROL
 # =========================
-def takeoff(cf, height=1.0, duration=2.0):
+def takeoff(cf, height=1.5, duration=2.0):
     steps = int(duration / 0.02)
     for i in range(steps):
         z = height * (i / steps)
@@ -165,7 +165,7 @@ def takeoff(cf, height=1.0, duration=2.0):
         time.sleep(0.02)
 
 
-def land(cf, height=1.0, duration=2.0):
+def land(cf, height=1.5, duration=2.0):
     steps = int(duration / 0.02)
     for i in range(steps):
         z = height * (1 - i / steps)
@@ -195,7 +195,8 @@ def run_trajectory(cf):
             # dp, _ , _  = path.do_square_xz(t, center=np.array([0.0, 0.0, 1.5]), side_length=1.0, omega=1.0)
             # dp, _ , _ = path.do_multistep_z(t, center=np.array([0.0, 0.0, 0.3]), step_height=0.4, n_steps=4, step_duration=4.0)
             # dp, _ , _ = path.do_linear_z(t, center=np.array([0.0, 0.0, 0.5]), z_speed=0.10)
-            dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
+            # dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
+            dp, _ , _ = path.do_circle_xz(t, center=np.array([0.0, 0.0, 1.5]), radius=0.5, omega=0.5)
 
             dp = np.array(dp).flatten()
             x, y, z = map(float, dp)

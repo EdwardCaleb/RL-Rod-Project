@@ -6,12 +6,12 @@ from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 
 from optitrack_natnet_main import tracker
 
-URI = 'radio://0/90/2M/E7E7E7E701'
-robot_id = 536
+URI = 'radio://0/90/2M/E7E7E7E705'
+robot_id = 542
 
 # iniciar tracker
 tracker = tracker.OptiTrackClient(
-    client_address="192.168.0.99",
+    client_address="192.168.0.32",
     server_address="192.168.0.4"
 )
 tracker.start()

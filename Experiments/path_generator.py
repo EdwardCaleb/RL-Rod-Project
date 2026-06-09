@@ -132,6 +132,31 @@ class PathGenerator:
         
         dpy = y_c
         dp = np.array([dpx, dpy, dpz])
+
+
+    def do_square_xy(self, t, center, side_length, omega):
+        # Genera una trayectoria cuadrada en el plano XY alrededor de un centro dado
+        x_c, y_c, z_c = center
+        period = 4 * side_length / (omega * side_length)  # Tiempo para completar un ciclo completo
+        t_mod = t % period
+        
+        if t_mod < period / 4:
+            dpx = x_c + side_length * (t_mod / (period / 4))
+            dpy = y_c
+        elif t_mod < period / 2:
+            dpx = x_c + side_length
+            dpy = y_c + side_length * ((t_mod - period / 4) / (period / 4))
+        elif t_mod < 3 * period / 4:
+            dpx = x_c + side_length * (1 - (t_mod - period / 2) / (period / 4))
+            dpy = y_c + side_length
+        else:
+            dpx = x_c
+            dpy = y_c + side_length * (1 - (t_mod - 3 * period / 4) / (period / 4))
+        
+        dpz = z_c
+        dp = np.array([dpx, dpy, dpz])
+
+        
         
         # Para la velocidad y aceleración, podríamos usar aproximaciones numéricas o derivar analíticamente cada segmento.
         # Aquí usaremos aproximaciones numéricas simples para mantenerlo sencillo.

@@ -2,7 +2,7 @@
 '''
 En este test:
 - Leemos el thrust en PWM y voltaje desde el Crazyflie
-- Estimamos la fuerza de thrust en newtons usando un modelo PWM a fuerza
+- Estimamos la fuerza de thrust usando un modelo PWM a fuerza
 '''
 
 import time
