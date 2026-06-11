@@ -5,6 +5,7 @@ En este test:
 - Estimamos la fuerza de thrust en newtons usando un modelo PWM a fuerza
 - Estimamos la fuerza exogena aplicada al drone en x, y, z usando un observador de fuerzas
 - Filtramos la fuerza exogena estimada para obtener una versión más suave y menos ruidosa
+- Incluimos la adicion de una fuerza exogena manual (empujón) durante la trayectoria para observar su efecto en la estimación de fuerza y su filtrado
 '''
 
 import time
@@ -20,13 +21,9 @@ from cflib.crazyflie.log import LogConfig
 
 from optitrack_natnet_main import tracker
 from path_generator import PathGenerator
-
 from full_state_estimator import FullStateEstimator
-
 from PWM_to_force_thrust import PwMToForceThrust
-
 from force_observer import ForceObserver
-
 from force_filter import MovingAverageForgettingFactorFilter
 
 
@@ -35,6 +32,9 @@ from force_filter import MovingAverageForgettingFactorFilter
 # =========================
 URI = 'radio://0/90/2M/E7E7E7E705'
 robot_id = 542
+
+DRONE_MASS = 0.153
+GRAVITY = 9.81
 
 logging.basicConfig(level=logging.ERROR)
 os.environ["CFCLIENT_CACHE_DIR"] = "./cache"
@@ -49,7 +49,6 @@ latest_state = {
     "force_thrust": None,
     "force_external": None,
 }
-
 
 
 # =========================
@@ -70,63 +69,109 @@ def send_extpos_loop(cf, estimator):
 
         if pos is not None and quat is not None:
             now = time.time()
-            dt = now - t_prev
+            dt = max(min(now - t_prev, 0.02), 0.005)
             t_prev = now
 
-            p = np.array(pos)
-            # optitrack devuelve quaterniones como [qx, qy, qz, qw], tomar eso en consideración para la estimación
-            q = np.array(quat)
+            p = np.array(pos, dtype=float)
 
-            # 🔴 ESTIMACIÓN COMPLETA
-            p, v, a, R = estimator.update_state_p_q(p, q, dt, input_format="xyzw")
+            # OptiTrack entrega quaternion como (x,y,z,w)
+            q = np.array(quat, dtype=float)
+
+            p, v, a, R = estimator.update_state_p_q(
+                p, q, dt, input_format="xyzw"
+            )
+
             latest_state["p"] = p
             latest_state["v"] = v
             latest_state["a"] = a
             latest_state["R"] = R
 
-            # enviar posición al Crazyflie
             cf.extpos.send_extpos(float(p[0]), float(p[1]), float(p[2]))
-
-            # # 🔍 DEBUG (cada ~100 ms)
-            # if int(now * 10) % 10 == 0:
-            #     print(f"v: {v}, a: {a}", f"R: \n{R}")
 
         time.sleep(0.01)
 
 
 # =========================
-# LOGGING + PWM model
+# VIRTUAL FORCE COMMAND
+# =========================
+def set_virtual_force(cf, f):
+    cf.param.set_value('ctrlMel.fvirt_x', str(float(f[0])))
+    cf.param.set_value('ctrlMel.fvirt_y', str(float(f[1])))
+    cf.param.set_value('ctrlMel.fvirt_z', str(float(f[2])))
+
+
+def virtual_force_loop(cf):
+    """
+    Fuerza virtual:
+    - 0 a 5 s: apagada
+    - 5 a 10 s: encendida
+    - 10 a 15 s: apagada
+    - 15 a 20 s: encendida
+    - luego apagada
+    """
+
+    f_on = np.array([0.5, 0.0, 0.0])  # N, empieza pequeño
+    f_off = np.array([0.0, 0.0, 0.0])
+
+    t0 = time.time()
+    last_state = None
+
+    while not stop_event.is_set():
+        t = time.time() - t0
+
+        if 5.0 <= t < 10.0:
+            f = f_on
+            state = "ON_1"
+        elif 15.0 <= t < 20.0:
+            f = f_on
+            state = "ON_2"
+        else:
+            f = f_off
+            state = "OFF"
+
+        set_virtual_force(cf, f)
+
+        if state != last_state:
+            print(f"Fvirt {state}: [{f[0]:.3f}, {f[1]:.3f}, {f[2]:.3f}] N")
+            last_state = state
+
+        time.sleep(0.05)
+
+    set_virtual_force(cf, f_off)
+
+
+# =========================
+# LOGGING + FORCE PIPELINE
 # =========================
 def log_callback(timestamp, data, logconf, pwm_model, force_observer, force_filter):
-    total_pwm = data.get('propForce.totalPwm', None)
+    pwm = data.get('propForce.totalPwm', None)
     vbat = data.get('pm.vbat', None)
 
-    if total_pwm is None or vbat is None:
+    if pwm is None or vbat is None:
         return
-    
-    force_est = pwm_model.pwm_to_force(total_pwm, vbat)
-    latest_state["force_thrust"] = force_est
 
+    force_est = pwm_model.pwm_to_force(pwm, vbat)
+    latest_state["force_thrust"] = force_est
 
     a = latest_state["a"]
     R = latest_state["R"]
 
-    f_ext = None
-
     if a is not None and R is not None:
-
-        # 🔴 fuerza externa (raw)
-        f_ext = force_observer.observe(u1_sclr=force_est, drone_acceleration=a, R=R)
-
-        # 🟢 filtro
+        f_ext = force_observer.observe(force_est, a, R)
         f_ext_filt = force_filter.filter(f_ext)
 
         latest_state["force_external"] = f_ext_filt
 
+        if timestamp % 100 == 0:
+            print(
+                f"[{timestamp}] "
+                f"F_raw: [{f_ext[0]:.2f}, {f_ext[1]:.2f}, {f_ext[2]:.2f}] | "
+                f"F_filt: [{f_ext_filt[0]:.2f}, {f_ext_filt[1]:.2f}, {f_ext_filt[2]:.2f}]"
+            )
         if (timestamp//10) % 10 == 0:
             print(
                 f"[{timestamp}] "
-                f"PWM: {total_pwm} | "
+                f"PWM: {pwm} | "
                 f"Vbat: {vbat:.2f} | "
                 f"Force Est(N): {force_est:.3f} | "
                 f"External Force Est(N): [{f_ext[0]:.3f}, {f_ext[1]:.3f}, {f_ext[2]:.3f}] N | "
@@ -144,29 +189,36 @@ def start_logging(cf, pwm_model, force_observer, force_filter):
 
     if log_conf.valid:
         log_conf.data_received_cb.add_callback(
-            lambda t, d, l: log_callback(t, d, l, pwm_model, force_observer, force_filter)
+            lambda t, d, l: log_callback(
+                t, d, l, pwm_model, force_observer, force_filter
+            )
         )
         log_conf.start()
         print("Logging started...")
         return log_conf
-    else:
-        print("Log config invalid")
-        return None
+
+    print("Log config invalid")
+    return None
 
 
 # =========================
 # CONTROL
 # =========================
-def takeoff(cf, height=1.0, duration=2.0):
+def takeoff(cf, height=0.5, duration=2.0):
     steps = int(duration / 0.02)
+
     for i in range(steps):
+        if stop_event.is_set():
+            break
+
         z = height * (i / steps)
         cf.commander.send_position_setpoint(0.0, 0.0, float(z), 0.0)
         time.sleep(0.02)
 
 
-def land(cf, height=1.0, duration=2.0):
+def land(cf, height=0.5, duration=2.0):
     steps = int(duration / 0.02)
+
     for i in range(steps):
         z = height * (1 - i / steps)
         cf.commander.send_position_setpoint(0.0, 0.0, float(z), 0.0)
@@ -180,7 +232,6 @@ def run_trajectory(cf):
 
     path = PathGenerator(dt=0.01)
 
-    # 🛫 TAKEOFF
     takeoff(cf, height=0.5, duration=2.0)
 
     t0 = time.time()
@@ -189,16 +240,18 @@ def run_trajectory(cf):
         while not stop_event.is_set():
             t = time.time() - t0
 
-            # trayectoria (elige una)
-            # dp, _ , _  path.do_sine_x(t, center=[0,0,1.5], amplitude=0.3, frequency=0.2)
-            # dp, _ , _  = path.do_fill_spherical_spiral(t, center=np.array([0.0, 0.0, 1.5]), radius=0.5, omega=0.5*np.sqrt(2), vertical_speed=0.5*(2)**(1/4))
-            # dp, _ , _  = path.do_square_xz(t, center=np.array([0.0, 0.0, 1.5]), side_length=1.0, omega=1.0)
-            # dp, _ , _ = path.do_multistep_z(t, center=np.array([0.0, 0.0, 0.3]), step_height=0.4, n_steps=4, step_duration=4.0)
-            dp, _ , _ = path.do_linear_z(t, center=np.array([0.0, 0.0, 0.5]), z_speed=0.05)
-            # dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
+            # dp, _, _ = path.do_linear_z(
+            #     t,
+            #     center=np.array([0.0, 0.0, 0.5]),
+            #     z_speed=0.1
+            # )
 
-            dp = np.array(dp).flatten()
-            x, y, z = map(float, dp)
+            # Alternativas:
+            dp, _, _ = path.fixed_point([0.0, 0.0, 1.5])
+            # dp, _, _ = path.do_sine_x(t, center=[0, 0, 0.5], amplitude=0.3, frequency=0.2)
+
+            dp = np.array(dp, dtype=float).flatten()
+            x, y, z = map(float, dp[:3])
 
             cf.commander.send_position_setpoint(x, y, z, 0.0)
 
@@ -209,6 +262,10 @@ def run_trajectory(cf):
 
     finally:
         print("Aterrizando...")
+
+        # Apagar fuerza virtual antes de aterrizar
+        set_virtual_force(cf, np.array([0.0, 0.0, 0.0]))
+
         land(cf, height=0.5, duration=2.0)
 
 
@@ -225,37 +282,36 @@ if __name__ == "__main__":
         print("Inicializando...")
         time.sleep(2)
 
-        # 🔧 CONFIGURACIÓN CONTROL
         cf.param.set_value('stabilizer.estimator', '2')
         cf.param.set_value('stabilizer.controller', '2')
         cf.param.set_value('commander.enHighLevel', '0')
 
-        # opcional: masa
-        # cf.param.set_value('ctrlMel.mass', '0.148')
+        # Asegura fuerza virtual inicial cero
+        set_virtual_force(cf, np.array([0.0, 0.0, 0.0]))
+
+        # opcional:
+        # cf.param.set_value('ctrlMel.mass', str(DRONE_MASS))
 
         time.sleep(0.5)
 
-        print("Armando dron...")
+        print("Armando...")
         cf.platform.send_arming_request(True)
         time.sleep(1.0)
 
         print("Controlador:", cf.param.get_value('stabilizer.controller'))
         print("Estimador:", cf.param.get_value('stabilizer.estimator'))
+        print("Fvirt x:", cf.param.get_value('ctrlMel.fvirt_x'))
+        print("Fvirt y:", cf.param.get_value('ctrlMel.fvirt_y'))
+        print("Fvirt z:", cf.param.get_value('ctrlMel.fvirt_z'))
 
+        estimator = FullStateEstimator(dt=0.01, alpha=0.2)
+        pwm_model = PwMToForceThrust(drone_mass=DRONE_MASS, gravity=GRAVITY)
+        force_observer = ForceObserver(drone_mass=DRONE_MASS, gravity=GRAVITY)
+        force_filter = MovingAverageForgettingFactorFilter(
+            window_size=5,
+            forgetting_factor=0.8
+        )
 
-        # Estimador de estado completo
-        estimator = FullStateEstimator(dt=0.01, alpha=0.5)
-
-        # Modelo PWM a fuerza
-        pwm_model = PwMToForceThrust()
-
-        # Force observer
-        force_observer = ForceObserver(drone_mass=0.153, gravity=9.81)
-
-        # Filtro de fuerza
-        force_filter = MovingAverageForgettingFactorFilter(window_size=50, forgetting_factor=0.99)
-        
-        # 🔹 Thread extpos
         extpos_thread = threading.Thread(
             target=send_extpos_loop,
             args=(cf, estimator),
@@ -263,8 +319,19 @@ if __name__ == "__main__":
         )
         extpos_thread.start()
 
-        # 🔹 Logging
-        log_conf = start_logging(cf, pwm_model, force_observer, force_filter)
+        fvirt_thread = threading.Thread(
+            target=virtual_force_loop,
+            args=(cf,),
+            daemon=True
+        )
+        fvirt_thread.start()
+
+        log_conf = start_logging(
+            cf,
+            pwm_model,
+            force_observer,
+            force_filter
+        )
 
         try:
             run_trajectory(cf)
@@ -278,6 +345,8 @@ if __name__ == "__main__":
             stop_event.set()
             time.sleep(0.5)
 
+            set_virtual_force(cf, np.array([0.0, 0.0, 0.0]))
+
             if log_conf is not None:
                 log_conf.stop()
 
@@ -288,5 +357,6 @@ if __name__ == "__main__":
             time.sleep(0.2)
 
             extpos_thread.join(timeout=1)
+            fvirt_thread.join(timeout=1)
 
             print("Finished")

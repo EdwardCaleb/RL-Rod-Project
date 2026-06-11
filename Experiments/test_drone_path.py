@@ -111,10 +111,20 @@ def run_trajectory(cf):
     # Usar Kalman estimator
     cf.param.set_value('stabilizer.estimator', '2')
 
+    # Usar Mellinger controller
+    cf.param.set_value('stabilizer.controller', '2')
+
     # Desactivar high level commander
     cf.param.set_value('commander.enHighLevel', '0')
 
     time.sleep(2)
+
+    print("Estimator:", cf.param.get_value('stabilizer.estimator'))
+    print("Controller:", cf.param.get_value('stabilizer.controller'))
+    print("Mellinger ki_xy:", cf.param.get_value('ctrlMel.ki_xy'))
+    print("Mellinger ki_z:", cf.param.get_value('ctrlMel.ki_z'))
+    print("Mellinger ki_m_xy:", cf.param.get_value('ctrlMel.ki_m_xy'))
+    print("Mellinger ki_m_z:", cf.param.get_value('ctrlMel.ki_m_z'))
 
     path = PathGenerator(dt=0.01)
 
@@ -133,7 +143,7 @@ def run_trajectory(cf):
             # =========================
 
             # Ejemplo 1: punto fijo
-            dp = path.fixed_point([1.5, 1.5, 1.5])
+            dp = path.fixed_point([0.0, 0.0, 1.5])
 
             # Ejemplo 2: seno en X
             # dp = path.do_sine_x(
