@@ -33,8 +33,8 @@ from force_filter import MovingAverageForgettingFactorFilter
 # =========================
 # CONFIG
 # =========================
-URI = 'radio://0/90/2M/E7E7E7E705'
-robot_id = 542
+URI = 'radio://0/90/2M/E7E7E7E701'
+robot_id = 529
 
 logging.basicConfig(level=logging.ERROR)
 os.environ["CFCLIENT_CACHE_DIR"] = "./cache"
@@ -194,8 +194,8 @@ def run_trajectory(cf):
             # dp, _ , _  = path.do_fill_spherical_spiral(t, center=np.array([0.0, 0.0, 1.5]), radius=0.5, omega=0.5*np.sqrt(2), vertical_speed=0.5*(2)**(1/4))
             # dp, _ , _  = path.do_square_xz(t, center=np.array([0.0, 0.0, 1.5]), side_length=1.0, omega=1.0)
             # dp, _ , _ = path.do_multistep_z(t, center=np.array([0.0, 0.0, 0.3]), step_height=0.4, n_steps=4, step_duration=4.0)
-            dp, _ , _ = path.do_linear_z(t, center=np.array([0.0, 0.0, 0.5]), z_speed=0.05)
-            # dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
+            # dp, _ , _ = path.do_linear_z(t, center=np.array([0.0, 0.0, 0.5]), z_speed=0.05)
+            dp, _ , _ = path.fixed_point([0.0, 0.0, 1.5])
 
             dp = np.array(dp).flatten()
             x, y, z = map(float, dp)
